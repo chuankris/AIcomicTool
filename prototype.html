@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>漫剧生成器 — 交互原型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #030712; color: #f9fafb; min-height: 100vh; }
+
+  /* Layout */
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+  header { background: #030712; border-bottom: 1px solid #1f2937; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 700; color: #a78bfa; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: #7c3aed; color: #fff; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: #9ca3af; border: 1px solid #374151; }
+  .btn-secondary:hover { border-color: #6b7280; color: #e5e7eb; }
+  .btn-danger { background: transparent; color: #f87171; border: 1px solid #7f1d1d; }
+  .btn-danger:hover { background: #7f1d1d30; }
+  .btn-ghost { background: transparent; color: #9ca3af; border: none; padding: 4px 8px; font-size: 12px; }
+  .btn-ghost:hover { color: #e5e7eb; }
+  .btn-ai { background: linear-gradient(135deg, #4c1d95, #1e3a8a); color: #c4b5fd; border: 1px solid #4c1d95; }
+  .btn-ai:hover { background: linear-gradient(135deg, #5b21b6, #1e40af); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+  /* Forms */
+  input, textarea, select {
+    background: #111827; border: 1px solid #374151; border-radius: 8px;
+    color: #f9fafb; padding: 8px 12px; font-size: 13px; width: 100%;
+    outline: none; font-family: inherit;
+  }
+  input:focus, textarea:focus { border-color: #7c3aed; }
+  textarea { resize: vertical; }
+  label { font-size: 12px; color: #9ca3af; margin-bottom: 4px; display: block; }
+
+  /* Cards */
+  .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+  .card-sm { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; }
+
+  /* Badge */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-yellow { background: #78350f40; color: #fcd34d; }
+  .badge-blue { background: #1e3a8a40; color: #93c5fd; }
+  .badge-green { background: #14532d40; color: #86efac; }
+  .badge-gray { background: #1f293740; color: #9ca3af; }
+  .badge-purple { background: #4c1d9540; color: #c4b5fd; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: #00000080; display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid #1f2937; }
+  .tab { padding: 12px 20px; font-size: 13px; cursor: pointer; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
+  .tab:hover { color: #e5e7eb; }
+  .tab.active { color: #a78bfa; border-bottom-color: #7c3aed; font-weight: 500; }
+
+  /* AI Refinement states */
+  .ai-state-idle {}
+  .ai-state-loading { opacity: 0.6; }
+  .ai-state-result { }
+
+  .ai-bubble { background: #1e1b4b; border: 1px solid #4c1d95; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6; }
+  .ai-bubble .prompt-tag { display: inline-block; background: #4c1d9530; color: #c4b5fd; border: 1px solid #4c1d9550; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-family: monospace; margin: 2px; }
+
+  .char-card { background: #111827; border: 1px solid #374151; border-radius: 10px; padding: 12px; display: flex; gap: 12px; }
+  .char-avatar { width: 64px; height: 80px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: #1f2937; display: flex; align-items: center; justify-content: center; color: #4b5563; font-size: 24px; }
+  .char-avatar.has-img { border: 1px solid #374151; }
+
+  /* Project list */
+  .project-item { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-between; cursor: pointer; transition: border-color 0.15s; }
+  .project-item:hover { border-color: #374151; }
+
+  /* Settings */
+  .setting-item { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+
+  /* Style grid */
+  .style-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .style-btn { padding: 10px; border: 1px solid #374151; border-radius: 8px; text-align: center; font-size: 13px; cursor: pointer; color: #9ca3af; transition: all 0.15s; }
+  .style-btn:hover { border-color: #6b7280; color: #e5e7eb; }
+  .style-btn.selected { border-color: #7c3aed; background: #4c1d9530; color: #c4b5fd; }
+
+  /* Panel grid */
+  .panel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .panel-item { background: #1f2937; border-radius: 8px; aspect-ratio: 9/16; display: flex; align-items: center; justify-content: center; color: #4b5563; font-size: 12px; border: 1px solid #374151; }
+  .panel-item.done { background: #111827; border-color: #374151; position: relative; overflow: hidden; }
+
+  /* Generating pulse */
+  @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
+  .generating { animation: pulse 1.5s infinite; }
+
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 16px; height: 16px; border: 2px solid #4c1d95; border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1f2937; border: 1px solid #374151; border-radius: 10px; padding: 10px 16px; font-size: 13px; color: #e5e7eb; z-index: 999; transform: translateY(100px); transition: transform 0.3s; }
+  .toast.show { transform: translateY(0); }
+
+  /* Misc */
+  .section-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .section-sub { font-size: 12px; color: #6b7280; margin-bottom: 16px; }
+  .divider { border: none; border-top: 1px solid #1f2937; margin: 20px 0; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .flex-1 { flex: 1; }
+  .mt-1 { margin-top: 4px; }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-1 { margin-bottom: 4px; }
+  .mb-2 { margin-bottom: 8px; }
+  .mb-3 { margin-bottom: 12px; }
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 11px; }
+  .text-gray { color: #6b7280; }
+  .text-purple { color: #a78bfa; }
+  .text-green { color: #86efac; }
+  .text-red { color: #f87171; }
+  .font-medium { font-weight: 500; }
+  .font-bold { font-weight: 700; }
+  .w-full { width: 100%; }
+  .link { color: #a78bfa; text-decoration: none; cursor: pointer; font-size: 13px; }
+  .link:hover { text-decoration: underline; }
+  .space-y-3 > * + * { margin-top: 12px; }
+  .space-y-4 > * + * { margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: 首页/项目列表 ==================== -->
+<div id="screen-home" class="screen active">
+  <header>
+    <h1>漫剧生成器</h1>
+    <div class="flex gap-2">
+      <button class="btn btn-secondary btn-sm" onclick="goto('screen-settings')">⚙️ AI 配置</button>
+    </div>
+  </header>
+  <div style="max-width:720px;margin:0 auto;padding:32px 24px;width:100%">
+    <div class="flex items-center justify-between mb-3">
+      <div>
+        <div class="section-title">我的项目</div>
+        <div class="text-xs text-gray mt-1">每个项目包含角色、剧本和生成的分镜</div>
+      </div>
+      <button class="btn btn-primary" onclick="showNewProjectModal()">＋ 新建项目</button>
+    </div>
+
+    <div class="space-y-3 mt-4">
+      <!-- 示例项目 -->
+      <div class="project-item" onclick="goto('screen-project')">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-medium text-sm">校园青春短剧</span>
+            <span class="badge badge-blue">待审核</span>
+          </div>
+          <div class="text-xs text-gray">日漫 · 12格分镜 · 2个角色</div>
+        </div>
+        <div class="text-xs text-gray" style="white-space:nowrap">2026-04-20</div>
+      </div>
+
+      <div class="project-item" style="cursor:default;opacity:0.6">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-medium text-sm">都市爱情故事</span>
+            <span class="badge badge-green">完成</span>
+          </div>
+          <div class="text-xs text-gray">韩漫 · 8格分镜 · 3个角色</div>
+        </div>
+        <div class="text-xs text-gray" style="white-space:nowrap">2026-04-19</div>
+      </div>
+
+      <div class="project-item" style="cursor:default;opacity:0.6">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-medium text-sm">奇幻冒险 Vol.1</span>
+            <span class="badge badge-gray">草稿</span>
+          </div>
+          <div class="text-xs text-gray">国风 · 0格分镜 · 1个角色</div>
+        </div>
+        <div class="text-xs text-gray" style="white-space:nowrap">2026-04-18</div>
+      </div>
+    </div>
+
+    <!-- 空状态提示 -->
+    <div class="text-xs text-gray mt-4" style="text-align:center">点击项目进入编辑，或新建一个开始创作</div>
+  </div>
+</div>
+
+<!-- ==================== MODAL: 新建项目 ==================== -->
+<div id="modal-new-project" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3>新建项目</h3>
+    <div class="space-y-4">
+      <div>
+        <label>项目名称（可选）</label>
+        <input id="new-project-name" placeholder="如：校园青春短剧" />
+      </div>
+      <div>
+        <label>漫画风格</label>
+        <div class="style-grid mt-1">
+          <div class="style-btn selected" onclick="selectStyle(this)">日漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">韩漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">美漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">国风</div>
+        </div>
+      </div>
+      <div>
+        <label>AI 配置</label>
+        <select>
+          <option>我的 Claude Key</option>
+          <option>OpenAI GPT-4o</option>
+        </select>
+        <div class="text-xs text-gray mt-1">没有配置？<span class="link" onclick="goto('screen-settings');hideModal('modal-new-project')">去设置页添加</span></div>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button class="btn btn-secondary flex-1" onclick="hideModal('modal-new-project')">取消</button>
+        <button class="btn btn-primary flex-1" onclick="hideModal('modal-new-project');goto('screen-project')">创建项目</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: 项目详情 ==================== -->
+<div id="screen-project" class="screen">
+  <header>
+    <div class="flex items-center gap-3">
+      <button class="btn-ghost" onclick="goto('screen-home')">← 项目列表</button>
+      <span style="color:#374151">|</span>
+      <span class="font-medium text-sm">校园青春短剧</span>
+      <span class="badge badge-gray">草稿</span>
+    </div>
+    <button class="btn btn-primary" id="btn-generate" onclick="showGenerateConfirm()" disabled>开始生成</button>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs" style="padding:0 24px">
+    <div class="tab active" onclick="switchTab(this,'tab-chars')">角色设定</div>
+    <div class="tab" onclick="switchTab(this,'tab-script')">剧本</div>
+    <div class="tab" onclick="switchTab(this,'tab-config')">配置</div>
+    <div class="tab" onclick="switchTab(this,'tab-panels')">分镜</div>
+  </div>
+
+  <!-- ===== TAB: 角色设定 ===== -->
+  <div id="tab-chars" class="flex-1" style="padding:24px;max-width:800px;margin:0 auto;width:100%">
+
+    <!-- 已有角色 -->
+    <div id="chars-list" class="space-y-3 mb-4">
+      <!-- 角色卡示例（已通过） -->
+      <div class="char-card">
+        <div class="char-avatar has-img" style="background:#1a1033;font-size:12px;color:#a78bfa;display:flex;align-items:center;justify-content:center">
+          <div style="text-align:center;line-height:1.3">预览<br>图</div>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-medium text-sm">小明</span>
+            <span class="badge badge-purple">角色</span>
+            <span class="badge badge-green" style="font-size:10px">✓ 已通过</span>
+          </div>
+          <div class="text-xs text-gray mb-2">17岁内向的黑发男高中生</div>
+          <div class="text-xs" style="color:#a78bfa;background:#1e1b4b;border:1px solid #4c1d9550;border-radius:6px;padding:6px 8px;line-height:1.6">
+            【黑色直发】【17岁】【学生制服】【内向】男生，略显忧郁的神情
+          </div>
+        </div>
+        <button class="btn-ghost" style="align-self:flex-start">✕</button>
+      </div>
+    </div>
+
+    <!-- 添加角色区域 -->
+    <div id="add-char-area">
+      <!-- Step A: 输入表单 -->
+      <div id="char-form" class="card">
+        <div class="section-title mb-1">添加角色 / 背景场景</div>
+        <div class="text-xs text-gray mb-3">用自然语言描述，AI 会润色成即梦关键词格式</div>
+
+        <div class="flex gap-2 mb-3">
+          <button class="btn btn-primary btn-sm" id="type-char" onclick="setCharType('char')">角色</button>
+          <button class="btn btn-secondary btn-sm" id="type-bg" onclick="setCharType('bg')">背景场景</button>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label>名称</label>
+            <input id="char-name" placeholder="如：小红 / 教室" />
+          </div>
+          <div>
+            <label>描述</label>
+            <textarea id="char-desc" rows="3" placeholder="如：16岁活泼的棕发女生，喜欢笑，穿着校服"></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary flex-1 btn-sm" onclick="resetCharForm()">清空</button>
+            <button class="btn btn-ai flex-1 btn-sm" onclick="showAiRefine()">✨ AI 润色</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step B: AI 润色中 -->
+      <div id="char-refining" class="card" style="display:none">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="spinner"></div>
+          <span class="text-sm text-gray generating">AI 正在润色关键词...</span>
+        </div>
+        <div style="background:#1f2937;border-radius:8px;height:80px;animation:pulse 1.5s infinite"></div>
+      </div>
+
+      <!-- Step C: 润色结果 -->
+      <div id="char-result" class="card" style="display:none">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span style="color:#86efac;font-size:14px">✨</span>
+            <span class="font-medium text-sm">AI 润色结果</span>
+          </div>
+          <span class="text-xs text-gray">小红 · 角色</span>
+        </div>
+
+        <!-- 属性卡 -->
+        <div class="card-sm mb-3" style="background:#0f172a">
+          <div class="text-xs text-gray mb-2">识别到的属性</div>
+          <div class="flex flex-wrap gap-1">
+            <span class="badge badge-gray">年龄：16岁</span>
+            <span class="badge badge-gray">性别：女生</span>
+            <span class="badge badge-gray">发色：棕色</span>
+            <span class="badge badge-gray">发型：长直发</span>
+            <span class="badge badge-gray">服装：白色校服</span>
+            <span class="badge badge-gray">性格：活泼</span>
+            <span class="badge badge-gray">表情：微笑</span>
+          </div>
+        </div>
+
+        <!-- 生成的 prompt -->
+        <div class="ai-bubble mb-3">
+          <div class="text-xs text-gray mb-1">即梦 Prompt</div>
+          <div>
+            <span class="prompt-tag">【棕色长直发】</span>
+            <span class="prompt-tag">【16岁】</span>
+            <span class="prompt-tag">【白色校服】</span>
+            <span class="prompt-tag">【活泼】</span>
+            女生，灿烂的微笑，青春朝气
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex gap-2 mb-3">
+          <button class="btn btn-secondary btn-sm flex-1" onclick="showRejectInput()">✕ 哪里不对</button>
+          <button class="btn btn-primary btn-sm flex-1" onclick="approveChar()">✓ 通过，生成预览图</button>
+        </div>
+
+        <!-- 不通过输入框（隐藏） -->
+        <div id="reject-input" style="display:none" class="mt-2">
+          <hr class="divider" style="margin:12px 0">
+          <label>哪里需要调整？</label>
+          <textarea rows="2" placeholder="如：头发应该是黑色，不是棕色；年龄改成17岁" class="mt-1"></textarea>
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-secondary btn-sm flex-1" onclick="hideRejectInput()">取消</button>
+            <button class="btn btn-ai btn-sm flex-1" onclick="showRefining()">✨ 重新润色</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step D: 通过后，生成预览图中 -->
+      <div id="char-generating" class="card" style="display:none">
+        <div class="flex items-center gap-3">
+          <div class="spinner"></div>
+          <div>
+            <div class="text-sm generating">正在生成角色预览图...</div>
+            <div class="text-xs text-gray mt-1">调用即梦 API，约需 10-20 秒</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary btn-sm mt-4 w-full" onclick="showCharForm()">＋ 添加更多角色 / 场景</button>
+  </div>
+
+  <!-- ===== TAB: 剧本 ===== -->
+  <div id="tab-script" class="flex-1" style="padding:24px;max-width:800px;margin:0 auto;width:100%;display:none">
+    <div class="section-title mb-1">故事剧本</div>
+    <div class="text-xs text-gray mb-3">支持多角色对话，格式：「角色：台词」，AI 会自动解析分镜</div>
+
+    <div class="flex gap-3" style="align-items:flex-start">
+      <!-- 剧本输入 -->
+      <div style="flex:1">
+        <textarea id="script-input" rows="16" placeholder="小明走进教室，看到小红坐在窗边。
+小明：你今天来得真早。
+小红：（微笑）昨晚没睡好，来这里待着。
+小明：（坐下）要不要一起吃早饭？
+小红：嗯，谢谢你。" style="line-height:1.7"></textarea>
+        <div class="flex items-center justify-between mt-1">
+          <span class="text-xs text-gray" id="script-len">0 字</span>
+          <button class="btn btn-ai btn-sm" onclick="showScriptOptimize()">✨ AI 优化</button>
+        </div>
+      </div>
+
+      <!-- AI 优化结果面板 -->
+      <div id="script-ai-panel" style="width:300px;display:none">
+        <div class="card" style="background:#0f172a">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="spinner" id="script-spinner"></div>
+            <span class="text-sm font-medium" id="script-ai-title">AI 正在优化...</span>
+          </div>
+          <div id="script-ai-content" style="display:none">
+            <div class="text-xs text-gray mb-2">优化后的剧本</div>
+            <div class="ai-bubble text-xs" style="line-height:1.8;max-height:280px;overflow-y:auto">
+【场景：明亮的高中教室，清晨阳光斜射入窗】<br>
+小明踏入教室，空气中还带着清晨的宁静。<br>
+小红靠坐在靠窗的位子，目光望向窗外。<br><br>
+小明：（惊讶）你今天来得真早啊。<br>
+小红：（回头，淡淡微笑）昨晚没睡好，来这里待着感觉好一点。<br>
+小明：（拉开椅子坐下）那……要不要一起吃早饭？<br>
+小红：（轻轻点头）嗯，谢谢你。
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button class="btn btn-secondary btn-sm flex-1" onclick="closeScriptPanel()">忽略</button>
+              <button class="btn btn-primary btn-sm flex-1" onclick="acceptScript()">✓ 采用</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: 配置 ===== -->
+  <div id="tab-config" class="flex-1" style="padding:24px;max-width:800px;margin:0 auto;width:100%;display:none">
+    <div class="space-y-4">
+      <div>
+        <div class="section-title mb-1">漫画风格</div>
+        <div class="style-grid mt-2">
+          <div class="style-btn selected" onclick="selectStyle(this)">日漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">韩漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">美漫</div>
+          <div class="style-btn" onclick="selectStyle(this)">国风</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <div class="section-title mb-1">AI 模型配置</div>
+        <div class="text-xs text-gray mb-3">用于剧本解析和角色润色</div>
+        <div class="space-y-2">
+          <div class="setting-item" id="cfg-claude" onclick="selectConfig('claude')" style="cursor:pointer;border-color:#7c3aed;background:#1e1b4b30">
+            <div>
+              <div class="text-sm font-medium">我的 Claude Key</div>
+              <div class="text-xs text-gray">claude-sonnet-4-6 · sk-ant-***</div>
+            </div>
+            <span style="color:#a78bfa">✓ 已选</span>
+          </div>
+          <div class="setting-item" id="cfg-openai" onclick="selectConfig('openai')" style="cursor:pointer">
+            <div>
+              <div class="text-sm font-medium">OpenAI GPT-4o</div>
+              <div class="text-xs text-gray">gpt-4o · sk-***</div>
+            </div>
+            <span class="text-xs text-gray">选择</span>
+          </div>
+        </div>
+        <div class="text-xs text-gray mt-2">没有配置？<span class="link" onclick="goto('screen-settings')">去设置页添加</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: 分镜 ===== -->
+  <div id="tab-panels" class="flex-1" style="padding:24px;max-width:900px;margin:0 auto;width:100%;display:none">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="badge badge-yellow">⏳ 生成中</span>
+      <span class="text-sm text-gray">3 / 8 格完成</span>
+    </div>
+    <div class="panel-grid">
+      <div class="panel-item done" style="background:#0f172a;font-size:11px;color:#a78bfa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <div>🖼️</div><div>第1格</div>
+      </div>
+      <div class="panel-item done" style="background:#0f172a;font-size:11px;color:#a78bfa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <div>🖼️</div><div>第2格</div>
+      </div>
+      <div class="panel-item done" style="background:#0f172a;font-size:11px;color:#a78bfa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <div>🖼️</div><div>第3格</div>
+      </div>
+      <div class="panel-item generating" style="font-size:11px;color:#fcd34d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <div class="spinner" style="border-color:#78350f;border-top-color:#fcd34d"></div>
+        <div>生成中</div>
+      </div>
+      <div class="panel-item" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px">
+        <div>⏳</div><div>等待中</div>
+      </div>
+      <div class="panel-item" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px">
+        <div>⏳</div><div>等待中</div>
+      </div>
+      <div class="panel-item" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px">
+        <div>⏳</div><div>等待中</div>
+      </div>
+      <div class="panel-item" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px">
+        <div>⏳</div><div>等待中</div>
+      </div>
+    </div>
+    <div class="text-xs text-gray mt-4" style="text-align:center">所有分镜生成完成后可进行批量审核</div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: Settings ==================== -->
+<div id="screen-settings" class="screen">
+  <header>
+    <div class="flex items-center gap-3">
+      <button class="btn-ghost" onclick="goto('screen-home')">← 返回</button>
+      <h1>配置管理</h1>
+    </div>
+  </header>
+  <div style="max-width:640px;margin:0 auto;padding:24px;width:100%">
+
+    <!-- AI 模型配置 -->
+    <div class="section-title mb-1">AI 模型配置</div>
+    <div class="text-xs text-gray mb-3">用于剧本解析、角色润色等文本生成</div>
+
+    <div class="space-y-2 mb-3" id="ai-configs">
+      <div class="setting-item">
+        <div>
+          <div class="text-sm font-medium">我的 Claude Key</div>
+          <div class="text-xs text-gray mt-1">
+            <span class="badge badge-purple" style="margin-right:6px">Claude</span>
+            claude-sonnet-4-6 · sk-ant-api03-***
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm">删除</button>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div class="text-sm font-medium">OpenAI GPT-4o</div>
+          <div class="text-xs text-gray mt-1">
+            <span class="badge badge-green" style="margin-right:6px">OpenAI</span>
+            gpt-4o · sk-proj-***
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm">删除</button>
+      </div>
+    </div>
+
+    <!-- 添加 AI 配置 -->
+    <div id="ai-form-toggle">
+      <button class="btn btn-secondary btn-sm w-full" onclick="showAiForm()">＋ 添加 AI 配置</button>
+    </div>
+    <div id="ai-form" class="card mt-2" style="display:none">
+      <div class="font-medium text-sm mb-3">添加 AI 配置</div>
+      <div class="space-y-3">
+        <div>
+          <label>配置名称</label>
+          <input placeholder="如：我的 Claude Key" />
+        </div>
+        <div>
+          <label>选择模型</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:4px">
+            <div class="style-btn selected" style="font-size:11px" onclick="selectStyle(this)">Claude</div>
+            <div class="style-btn" style="font-size:11px" onclick="selectStyle(this)">GPT-4o</div>
+            <div class="style-btn" style="font-size:11px" onclick="selectStyle(this)">Gemini</div>
+            <div class="style-btn" style="font-size:11px" onclick="selectStyle(this)">自定义</div>
+          </div>
+        </div>
+        <div>
+          <label>API Key</label>
+          <input type="password" placeholder="sk-..." />
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary flex-1 btn-sm" onclick="hideAiForm()">取消</button>
+          <button class="btn btn-primary flex-1 btn-sm" onclick="saveAiConfig()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- 即梦配置 -->
+    <div class="section-title mb-1">即梦图像生成配置</div>
+    <div class="text-xs text-gray mb-3">火山引擎访问凭证，用于生成漫画分镜和角色预览图</div>
+
+    <div id="jimeng-display" class="card">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm font-medium mb-1">当前配置</div>
+          <div class="text-xs text-gray">Access Key ID：AKLTMz***Yj</div>
+          <div class="text-xs text-gray mt-1">Secret Key：OWI3***ZmM=（已保存）</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showJimengForm()">修改</button>
+      </div>
+    </div>
+
+    <div id="jimeng-form" class="card" style="display:none">
+      <div class="font-medium text-sm mb-3">配置即梦凭证</div>
+      <div class="space-y-3">
+        <div>
+          <label>Access Key ID</label>
+          <input placeholder="AKLTxxxxxxxx" />
+          <div class="text-xs text-gray mt-1">火山引擎控制台 → 访问控制 → 访问密钥</div>
+        </div>
+        <div>
+          <label>Secret Access Key</label>
+          <input type="password" placeholder="xxxxxxxxxxxxxxxx" />
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary flex-1 btn-sm" onclick="hideJimengForm()">取消</button>
+          <button class="btn btn-primary flex-1 btn-sm" onclick="saveJimengConfig()">保存</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// Navigation
+function goto(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// Modal
+function showNewProjectModal() {
+  document.getElementById('modal-new-project').style.display = 'flex';
+}
+function hideModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+// Style selection
+function selectStyle(el) {
+  el.closest('.style-grid, div').querySelectorAll('.style-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Tab switching
+function switchTab(tabEl, contentId) {
+  // tabs
+  tabEl.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  // content
+  ['tab-chars','tab-script','tab-config','tab-panels'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById(contentId).style.display = 'block';
+}
+
+// Character type toggle
+function setCharType(type) {
+  document.getElementById('type-char').className = 'btn btn-sm ' + (type==='char' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('type-bg').className = 'btn btn-sm ' + (type==='bg' ? 'btn-primary' : 'btn-secondary');
+}
+
+// AI Refine flow
+function showAiRefine() {
+  const name = document.getElementById('char-name').value;
+  const desc = document.getElementById('char-desc').value;
+  if (!name || !desc) { toast('请填写名称和描述'); return; }
+  document.getElementById('char-form').style.display = 'none';
+  document.getElementById('char-refining').style.display = 'block';
+  document.getElementById('char-result').style.display = 'none';
+  setTimeout(() => {
+    document.getElementById('char-refining').style.display = 'none';
+    document.getElementById('char-result').style.display = 'block';
+    document.getElementById('reject-input').style.display = 'none';
+  }, 2000);
+}
+
+function showRefining() {
+  document.getElementById('char-result').style.display = 'none';
+  document.getElementById('char-refining').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('char-refining').style.display = 'none';
+    document.getElementById('char-result').style.display = 'block';
+    document.getElementById('reject-input').style.display = 'none';
+    toast('已重新润色');
+  }, 1800);
+}
+
+function showRejectInput() {
+  document.getElementById('reject-input').style.display = 'block';
+}
+function hideRejectInput() {
+  document.getElementById('reject-input').style.display = 'none';
+}
+
+function approveChar() {
+  document.getElementById('char-result').style.display = 'none';
+  document.getElementById('char-generating').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('char-generating').style.display = 'none';
+    document.getElementById('add-char-area').style.display = 'none';
+    document.querySelector('#chars-list').innerHTML += `
+      <div class="char-card">
+        <div class="char-avatar has-img" style="background:#1a3322;font-size:12px;color:#86efac;display:flex;align-items:center;justify-content:center">
+          <div style="text-align:center;line-height:1.3">预览<br>图</div>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-medium text-sm">小红</span>
+            <span class="badge badge-purple">角色</span>
+            <span class="badge badge-green" style="font-size:10px">✓ 已通过</span>
+          </div>
+          <div class="text-xs text-gray mb-2">16岁活泼的棕发女生，喜欢笑，穿着校服</div>
+          <div class="text-xs" style="color:#a78bfa;background:#1e1b4b;border:1px solid #4c1d9550;border-radius:6px;padding:6px 8px;line-height:1.6">
+            【棕色长直发】【16岁】【白色校服】【活泼】女生，灿烂的微笑
+          </div>
+        </div>
+        <button class="btn-ghost" style="align-self:flex-start">✕</button>
+      </div>`;
+    checkGenerateReady();
+    toast('角色「小红」已添加，可继续添加更多');
+  }, 2500);
+}
+
+function showCharForm() {
+  document.getElementById('add-char-area').style.display = 'block';
+  document.getElementById('char-form').style.display = 'block';
+  document.getElementById('char-refining').style.display = 'none';
+  document.getElementById('char-result').style.display = 'none';
+  document.getElementById('char-generating').style.display = 'none';
+  document.getElementById('char-name').value = '';
+  document.getElementById('char-desc').value = '';
+}
+
+function resetCharForm() {
+  document.getElementById('char-name').value = '';
+  document.getElementById('char-desc').value = '';
+}
+
+// Script AI optimize
+function showScriptOptimize() {
+  const panel = document.getElementById('script-ai-panel');
+  panel.style.display = 'block';
+  document.getElementById('script-spinner').style.display = 'block';
+  document.getElementById('script-ai-title').textContent = 'AI 正在优化...';
+  document.getElementById('script-ai-content').style.display = 'none';
+  setTimeout(() => {
+    document.getElementById('script-spinner').style.display = 'none';
+    document.getElementById('script-ai-title').textContent = '优化完成';
+    document.getElementById('script-ai-content').style.display = 'block';
+  }, 2200);
+}
+
+function closeScriptPanel() {
+  document.getElementById('script-ai-panel').style.display = 'none';
+}
+
+function acceptScript() {
+  document.getElementById('script-input').value = `【场景：明亮的高中教室，清晨阳光斜射入窗】
+小明踏入教室，空气中还带着清晨的宁静。
+小红靠坐在靠窗的位子，目光望向窗外。
+
+小明：（惊讶）你今天来得真早啊。
+小红：（回头，淡淡微笑）昨晚没睡好，来这里待着感觉好一点。
+小明：（拉开椅子坐下）那……要不要一起吃早饭？
+小红：（轻轻点头）嗯，谢谢你。`;
+  updateScriptLen();
+  closeScriptPanel();
+  toast('已采用优化版剧本');
+  checkGenerateReady();
+}
+
+// Script length counter
+document.addEventListener('DOMContentLoaded', () => {
+  const si = document.getElementById('script-input');
+  if (si) {
+    si.addEventListener('input', updateScriptLen);
+  }
+});
+function updateScriptLen() {
+  const len = (document.getElementById('script-input').value || '').length;
+  document.getElementById('script-len').textContent = len + ' 字';
+}
+
+// Config selection
+function selectConfig(type) {
+  ['claude','openai'].forEach(t => {
+    const el = document.getElementById('cfg-'+t);
+    if (!el) return;
+    if (t === type) {
+      el.style.borderColor = '#7c3aed';
+      el.style.background = '#1e1b4b30';
+      el.querySelector('span').textContent = '✓ 已选';
+      el.querySelector('span').style.color = '#a78bfa';
+    } else {
+      el.style.borderColor = '#1f2937';
+      el.style.background = '#111827';
+      el.querySelector('span').textContent = '选择';
+      el.querySelector('span').style.color = '#6b7280';
+    }
+  });
+}
+
+// Generate readiness check
+function checkGenerateReady() {
+  document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-generate').style.opacity = '1';
+}
+
+function showGenerateConfirm() {
+  if (confirm('确认开始生成分镜？AI 将解析剧本并批量生成图片（约需1-3分钟）')) {
+    switchTab(document.querySelector('.tab:last-child'), 'tab-panels');
+    document.querySelector('.tab:last-child').click();
+    // 找到分镜tab
+    document.querySelectorAll('.tab')[3].click();
+    toast('生成已开始，请在「分镜」标签查看进度');
+  }
+}
+
+// Settings page
+function showAiForm() {
+  document.getElementById('ai-form').style.display = 'block';
+  document.getElementById('ai-form-toggle').style.display = 'none';
+}
+function hideAiForm() {
+  document.getElementById('ai-form').style.display = 'none';
+  document.getElementById('ai-form-toggle').style.display = 'block';
+}
+function saveAiConfig() {
+  hideAiForm();
+  toast('AI 配置已保存');
+}
+function showJimengForm() {
+  document.getElementById('jimeng-display').style.display = 'none';
+  document.getElementById('jimeng-form').style.display = 'block';
+}
+function hideJimengForm() {
+  document.getElementById('jimeng-display').style.display = 'block';
+  document.getElementById('jimeng-form').style.display = 'none';
+}
+function saveJimengConfig() {
+  hideJimengForm();
+  toast('即梦配置已保存');
+}
+
+// Tab click for project page
+document.querySelectorAll('#screen-project .tab').forEach((tab, i) => {
+  tab.addEventListener('click', function() {
+    const ids = ['tab-chars','tab-script','tab-config','tab-panels'];
+    document.querySelectorAll('#screen-project .tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    ids.forEach(id => document.getElementById(id).style.display = 'none');
+    document.getElementById(ids[i]).style.display = 'block';
+  });
+});
+
+// Toast
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
