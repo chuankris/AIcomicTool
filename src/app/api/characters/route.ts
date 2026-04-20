@@ -4,6 +4,7 @@ import { characters, projects } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { buildCharacterPrompt } from '@/lib/ai/prompt-builder'
 import { generateImage } from '@/lib/jimeng/client'
+import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { CharacterAttributes, ModelConfig } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -24,7 +25,13 @@ export async function POST(req: NextRequest) {
     const style = project.style
 
     const prompt = buildCharacterPrompt(attributes, style)
-    const { imageUrl } = await generateImage({ prompt, style })
+    const { accessKeyId, secretAccessKey } = await getJimengCredentials()
+    const { imageUrl: referenceImageUrl } = await generateImage({
+      prompt,
+      style: project.style,
+      accessKeyId,
+      secretAccessKey,
+    })
 
     const [char] = await db.insert(characters).values({
       projectId: project.id,
@@ -32,7 +39,7 @@ export async function POST(req: NextRequest) {
       description,
       attributes: JSON.stringify(attributes),
       prompt,
-      referenceImageUrl: imageUrl,
+      referenceImageUrl,
       type,
     }).returning()
 

@@ -7,6 +7,7 @@ import { parseScript } from '@/lib/ai/script-parser'
 import { buildPanelPrompt, buildCharacterPrompt } from '@/lib/ai/prompt-builder'
 import { extractCharacterAttributes } from '@/lib/ai/character-extractor'
 import { generateImage } from '@/lib/jimeng/client'
+import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { ModelConfig, Character } from '@/types'
 
 const CONCURRENCY = 3
@@ -37,13 +38,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
 
+    const creds = await getJimengCredentials()
+
     const body = await req.json().catch(() => ({}))
     const characterDescriptions = (body as { characterDescriptions?: Array<{name: string; description: string; type: string}> }).characterDescriptions ?? []
 
     for (const charDesc of characterDescriptions) {
       const attributes = await extractCharacterAttributes(charDesc.description, modelConfig)
       const prompt = buildCharacterPrompt(attributes, project.style)
-      const { imageUrl: refUrl } = await generateImage({ prompt, style: project.style })
+      const { imageUrl: refUrl } = await generateImage({ prompt, style: project.style, accessKeyId: creds.accessKeyId, secretAccessKey: creds.secretAccessKey })
       await db.insert(characters).values({
         projectId: project.id,
         name: charDesc.name,
@@ -88,7 +91,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           style: project.style,
         })
         const referenceImageUrl = panelChars[0]?.referenceImageUrl ?? undefined
-        const { imageUrl } = await generateImage({ prompt, style: project.style, referenceImageUrl })
+        const { imageUrl } = await generateImage({
+          prompt,
+          style: project.style,
+          referenceImageUrl,
+          accessKeyId: creds.accessKeyId,
+          secretAccessKey: creds.secretAccessKey,
+        })
         await db.update(panels).set({ imageUrl, prompt, status: 'done' }).where(eq(panels.id, panel.id))
       } catch {
         await db.update(panels).set({ status: 'failed' }).where(eq(panels.id, panel.id))

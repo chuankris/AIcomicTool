@@ -4,6 +4,7 @@ import { projects, panels, characters } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { applyReviewFeedback } from '@/lib/ai/review-parser'
 import { generateImage } from '@/lib/jimeng/client'
+import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { ModelConfig, Character } from '@/types'
 
 interface ReviewItem {
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     if (!reviews?.length) return NextResponse.json({ error: 'reviews is required' }, { status: 400 })
 
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
+    const creds = await getJimengCredentials()
     const chars: Character[] = (await db.select().from(characters).where(eq(characters.projectId, project.id)))
       .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
 
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           prompt: newPrompt,
           style: project.style,
           referenceImageUrl,
+          accessKeyId: creds.accessKeyId,
+          secretAccessKey: creds.secretAccessKey,
         })
         await db.update(panels).set({
           prompt: newPrompt,

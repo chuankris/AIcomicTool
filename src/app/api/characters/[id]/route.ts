@@ -4,6 +4,7 @@ import { characters, projects } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { buildCharacterPrompt } from '@/lib/ai/prompt-builder'
 import { generateImage } from '@/lib/jimeng/client'
+import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { CharacterAttributes } from '@/types'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(attributes ?? {}),
     }
     const prompt = buildCharacterPrompt(mergedAttributes, project.style)
-    const { imageUrl } = await generateImage({ prompt, style: project.style })
+    const { accessKeyId, secretAccessKey } = await getJimengCredentials()
+    const { imageUrl } = await generateImage({ prompt, style: project.style, accessKeyId, secretAccessKey })
 
     const [updated] = await db.update(characters)
       .set({

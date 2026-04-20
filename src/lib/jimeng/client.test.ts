@@ -3,8 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-vi.stubEnv('JIMENG_ACCESS_KEY', 'test-ak')
-vi.stubEnv('JIMENG_SECRET_KEY', 'test-sk')
+const TEST_CREDS = { accessKeyId: 'test-ak', secretAccessKey: 'test-sk' }
 
 describe('jimeng client', () => {
   beforeEach(() => {
@@ -18,7 +17,7 @@ describe('jimeng client', () => {
     })
 
     const { generateImage } = await import('./client')
-    const result = await generateImage({ prompt: '测试角色', style: '日漫' })
+    const result = await generateImage({ prompt: '测试角色', style: '日漫', ...TEST_CREDS })
 
     expect(mockFetch).toHaveBeenCalledOnce()
     const [url, options] = mockFetch.mock.calls[0]
@@ -30,6 +29,6 @@ describe('jimeng client', () => {
   it('throws on API error', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' })
     const { generateImage } = await import('./client')
-    await expect(generateImage({ prompt: 'x', style: '日漫' })).rejects.toThrow('即梦 API error 400')
+    await expect(generateImage({ prompt: 'x', style: '日漫', ...TEST_CREDS })).rejects.toThrow('即梦 API error 400')
   })
 })

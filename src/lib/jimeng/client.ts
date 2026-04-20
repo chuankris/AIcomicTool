@@ -1,5 +1,3 @@
-// Note: API params below need verification against actual 即梦 docs
-// Docs: https://www.volcengine.com/docs/85273/overview
 import { buildSignedHeaders } from './sign'
 
 const BASE_URL = 'https://visual.volcengineapi.com'
@@ -13,6 +11,8 @@ export interface GenerateImageParams {
   referenceStrength?: number
   width?: number
   height?: number
+  accessKeyId: string
+  secretAccessKey: string
 }
 
 export interface GenerateImageResult {
@@ -20,10 +20,10 @@ export interface GenerateImageResult {
 }
 
 export async function generateImage(params: GenerateImageParams): Promise<GenerateImageResult> {
-  const ACCESS_KEY = process.env.JIMENG_ACCESS_KEY!
-  const SECRET_KEY = process.env.JIMENG_SECRET_KEY!
-
-  const { prompt, style, referenceImageUrl, referenceStrength = 0.7, width = 720, height = 1280 } = params
+  const {
+    prompt, style, referenceImageUrl, referenceStrength = 0.7,
+    width = 720, height = 1280, accessKeyId, secretAccessKey,
+  } = params
 
   const body = JSON.stringify({
     req_key: 'jimeng_high_aes_general_v21_L',
@@ -43,8 +43,8 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
     method: 'POST',
     uri,
     body,
-    accessKey: ACCESS_KEY,
-    secretKey: SECRET_KEY,
+    accessKey: accessKeyId,
+    secretKey: secretAccessKey,
     service: SERVICE,
     region: REGION,
   })
