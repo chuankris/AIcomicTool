@@ -1,4 +1,4 @@
-export type ProjectStatus = 'pending' | 'generating' | 'reviewing' | 'done' | 'failed'
+export type ProjectStatus = 'draft' | 'pending' | 'generating' | 'reviewing' | 'done' | 'failed'
 export type PanelStatus = 'pending' | 'generating' | 'done' | 'failed'
 export type CharacterType = 'character' | 'background'
 
@@ -68,4 +68,21 @@ export interface ParsedPanel {
 export interface ProjectWithDetails extends Project {
   characters: Character[]
   panels: Panel[]
+}
+
+export interface ModelSetting {
+  id: number
+  name: string
+  provider: 'claude' | 'openai' | 'gemini' | 'custom'
+  baseURL: string
+  model: string
+  apiKey: string
+  createdAt: number
+}
+
+export interface JimengConfig {
+  id: number
+  accessKeyId: string
+  secretAccessKey: string
+  updatedAt: number
 }
