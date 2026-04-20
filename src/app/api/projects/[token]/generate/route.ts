@@ -4,8 +4,7 @@ import { db } from '@/lib/db'
 import { projects, characters, panels } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { parseScript } from '@/lib/ai/script-parser'
-import { buildPanelPrompt, buildCharacterPrompt } from '@/lib/ai/prompt-builder'
-import { extractCharacterAttributes } from '@/lib/ai/character-extractor'
+import { buildPanelPrompt } from '@/lib/ai/prompt-builder'
 import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { ModelConfig, Character } from '@/types'
@@ -30,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   try {
     const [project] = await db.select().from(projects).where(eq(projects.token, token))
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    if (project.status !== 'pending') {
+    if (project.status !== 'draft') {
       return NextResponse.json({ error: 'Project already started' }, { status: 409 })
     }
 
@@ -39,24 +38,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
 
     const creds = await getJimengCredentials()
-
-    const body = await req.json().catch(() => ({}))
-    const characterDescriptions = (body as { characterDescriptions?: Array<{name: string; description: string; type: string}> }).characterDescriptions ?? []
-
-    for (const charDesc of characterDescriptions) {
-      const attributes = await extractCharacterAttributes(charDesc.description, modelConfig)
-      const prompt = buildCharacterPrompt(attributes, project.style)
-      const { imageUrl: refUrl } = await generateImage({ prompt, style: project.style, accessKeyId: creds.accessKeyId, secretAccessKey: creds.secretAccessKey })
-      await db.insert(characters).values({
-        projectId: project.id,
-        name: charDesc.name,
-        description: charDesc.description,
-        attributes: JSON.stringify(attributes),
-        prompt,
-        referenceImageUrl: refUrl,
-        type: charDesc.type as 'character' | 'background',
-      })
-    }
 
     const chars: Character[] = (await db.select().from(characters).where(eq(characters.projectId, project.id)))
       .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
