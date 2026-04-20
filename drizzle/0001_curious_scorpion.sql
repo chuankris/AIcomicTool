@@ -28,7 +28,7 @@ CREATE TABLE `__new_projects` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `__new_projects`("id", "token", "name", "script", "style", "model_config", "status", "video_url", "created_at") SELECT "id", "token", "name", "script", "style", "model_config", "status", "video_url", "created_at" FROM `projects`;--> statement-breakpoint
+INSERT INTO `__new_projects`("id", "token", "name", "script", "style", "model_config", "status", "video_url", "created_at") SELECT "id", "token", NULL, "script", "style", "model_config", "status", "video_url", "created_at" FROM `projects`;--> statement-breakpoint
 DROP TABLE `projects`;--> statement-breakpoint
 ALTER TABLE `__new_projects` RENAME TO `projects`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
