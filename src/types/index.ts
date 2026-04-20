@@ -22,6 +22,7 @@ export interface CharacterAttributes {
 export interface Project {
   id: number
   token: string
+  name: string | null
   script: string
   style: string
   modelConfig: ModelConfig
