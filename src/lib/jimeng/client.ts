@@ -9,7 +9,7 @@ const REGION = 'cn-north-1'
 export interface GenerateImageParams {
   prompt: string
   style: string
-  referenceImageUrl?: string
+  referenceImageUrl?: string | null
   referenceStrength?: number
   width?: number
   height?: number
