@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { WizardLayout } from '@/components/create/WizardLayout'
 import { Step2StyleModel } from '@/components/create/Step2StyleModel'
+import { Step1Characters } from '@/components/create/Step1Characters'
+import type { CharacterEntry } from '@/components/create/Step1Characters'
 import type { ModelConfig } from '@/types'
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = {
@@ -18,6 +20,7 @@ export default function CreatePage() {
   const [script, setScript] = useState('')
   const [style, setStyle] = useState('日漫')
   const [modelConfig, setModelConfig] = useState<ModelConfig>(DEFAULT_MODEL_CONFIG)
+  const [characters, setCharacters] = useState<CharacterEntry[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,7 +40,7 @@ export default function CreatePage() {
       const genRes = await fetch(`/api/projects/${token}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterDescriptions: [] }),
+        body: JSON.stringify({ characterDescriptions: characters }),
       })
       if (!genRes.ok) throw new Error('触发生成失败，请在项目页面重试')
       router.push(`/project/${token}`)

@@ -4,7 +4,8 @@ import { db } from '@/lib/db'
 import { projects, characters, panels } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { parseScript } from '@/lib/ai/script-parser'
-import { buildPanelPrompt } from '@/lib/ai/prompt-builder'
+import { buildPanelPrompt, buildCharacterPrompt } from '@/lib/ai/prompt-builder'
+import { extractCharacterAttributes } from '@/lib/ai/character-extractor'
 import { generateImage } from '@/lib/jimeng/client'
 import type { ModelConfig, Character } from '@/types'
 
@@ -35,6 +36,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     await db.update(projects).set({ status: 'generating' }).where(eq(projects.token, token))
 
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
+
+    const body = await req.json().catch(() => ({}))
+    const characterDescriptions = (body as { characterDescriptions?: Array<{name: string; description: string; type: string}> }).characterDescriptions ?? []
+
+    for (const charDesc of characterDescriptions) {
+      const attributes = await extractCharacterAttributes(charDesc.description, modelConfig)
+      const prompt = buildCharacterPrompt(attributes, project.style)
+      const { imageUrl: refUrl } = await generateImage({ prompt, style: project.style })
+      await db.insert(characters).values({
+        projectId: project.id,
+        name: charDesc.name,
+        description: charDesc.description,
+        attributes: JSON.stringify(attributes),
+        prompt,
+        referenceImageUrl: refUrl,
+        type: charDesc.type as 'character' | 'background',
+      })
+    }
+
     const chars: Character[] = (await db.select().from(characters).where(eq(characters.projectId, project.id)))
       .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
 
