@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { projects, settings } from '@/lib/db/schema'
+import { projects, settings, panels, characters } from '@/lib/db/schema'
 import { randomUUID } from 'crypto'
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import type { ModelConfig } from '@/types'
 
 export async function GET() {
@@ -14,8 +14,28 @@ export async function GET() {
       style: projects.style,
       status: projects.status,
       createdAt: projects.createdAt,
+      currentStep: projects.currentStep,
+      furthestStep: projects.furthestStep,
     }).from(projects).orderBy(desc(projects.createdAt))
-    return NextResponse.json(rows)
+
+    const allPanelCounts = await db
+      .select({ projectId: panels.projectId, count: sql<number>`count(*)` })
+      .from(panels)
+      .groupBy(panels.projectId)
+
+    const allCharCounts = await db
+      .select({ projectId: characters.projectId, count: sql<number>`count(*)` })
+      .from(characters)
+      .groupBy(characters.projectId)
+
+    const panelMap = Object.fromEntries(allPanelCounts.map(r => [r.projectId, r.count]))
+    const charMap = Object.fromEntries(allCharCounts.map(r => [r.projectId, r.count]))
+
+    return NextResponse.json(rows.map(p => ({
+      ...p,
+      panelCount: panelMap[p.id] ?? 0,
+      charCount: charMap[p.id] ?? 0,
+    })))
   } catch (e) {
     console.error('[projects GET]', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

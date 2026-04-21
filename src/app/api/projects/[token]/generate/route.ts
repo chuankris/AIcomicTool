@@ -7,7 +7,7 @@ import { parseScript } from '@/lib/ai/script-parser'
 import { buildPanelPrompt } from '@/lib/ai/prompt-builder'
 import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
-import type { ModelConfig, Character } from '@/types'
+import type { ModelConfig, Character, Shot } from '@/types'
 
 const CONCURRENCY = 3
 
@@ -43,7 +43,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
 
     // 1. 解析剧本
-    const parsedPanels = await parseScript(project.script, project.style, modelConfig)
+    const shotList: Shot[] = project.shots ? (() => {
+      try { return JSON.parse(project.shots) } catch { return [] }
+    })() : []
+
+    const parsedPanels = shotList.length > 0
+      ? shotList.map(s => ({
+          index: s.index,
+          sceneDesc: s.sceneDesc,
+          characters: s.characters,
+          dialogue: s.dialogue,
+          emotion: s.emotion,
+          composition: s.composition,
+          prompt: '',
+        }))
+      : await parseScript(project.script, project.style, modelConfig)
 
     // 2. 写入 panels 表（状态 pending）
     const insertedPanels = await db.insert(panels).values(
@@ -54,6 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
         dialogue: p.dialogue,
         prompt: p.prompt,
         status: 'pending' as const,
+        imageModel: project.imageModel || 'jimeng',
       }))
     ).returning()
 

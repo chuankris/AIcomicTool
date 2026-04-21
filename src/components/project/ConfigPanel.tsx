@@ -4,6 +4,13 @@ import type { ModelSetting } from '@/types'
 
 const STYLES = ['日漫', '韩漫', '美漫', '国风']
 
+const IMAGE_MODELS = [
+  { id: 'jimeng', label: '即梦' },
+  { id: 'mj-niji', label: 'MJ niji' },
+  { id: 'sd-xl', label: 'SD XL' },
+  { id: 'kling', label: '可灵' },
+]
+
 const PROVIDER_LABELS: Record<string, string> = {
   claude: 'Claude', openai: 'OpenAI', gemini: 'Gemini', custom: '自定义',
 }
@@ -11,14 +18,17 @@ const PROVIDER_LABELS: Record<string, string> = {
 interface Props {
   token: string
   initialStyle: string
+  initialImageModel?: string
   onStyleChange: (style: string) => void
 }
 
-export function ConfigPanel({ token, initialStyle, onStyleChange }: Props) {
+export function ConfigPanel({ token, initialStyle, initialImageModel = 'jimeng', onStyleChange }: Props) {
   const [style, setStyle] = useState(initialStyle)
+  const [imageModel, setImageModel] = useState(initialImageModel)
   const [configs, setConfigs] = useState<ModelSetting[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [imageModelSaved, setImageModelSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -44,6 +54,22 @@ export function ConfigPanel({ token, initialStyle, onStyleChange }: Props) {
     }
   }
 
+  async function handleImageModelChange(model: string) {
+    setImageModel(model)
+    try {
+      const res = await fetch(`/api/projects/${token}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageModel: model }),
+      })
+      if (!res.ok) throw new Error('保存失败')
+      setImageModelSaved(true)
+      setTimeout(() => setImageModelSaved(false), 2000)
+    } catch {
+      // silently fail, model is still updated locally
+    }
+  }
+
   return (
     <div className="space-y-8">
       {error && <p className="text-red-400 text-xs">{error}</p>}
@@ -60,6 +86,26 @@ export function ConfigPanel({ token, initialStyle, onStyleChange }: Props) {
                   : 'border-gray-700 text-gray-400 hover:border-gray-600'
               }`}>
               {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-sm font-semibold">图片生成模型</h2>
+          {imageModelSaved && <span className="text-xs text-green-400">已保存 ✓</span>}
+        </div>
+        <p className="text-xs text-gray-500 mb-3">选择用于生成分镜图片的模型</p>
+        <div className="grid grid-cols-4 gap-3">
+          {IMAGE_MODELS.map(m => (
+            <button key={m.id} onClick={() => handleImageModelChange(m.id)}
+              className={`py-3 rounded-lg border text-sm font-medium transition-colors ${
+                imageModel === m.id
+                  ? 'border-purple-500 bg-purple-900/40 text-purple-300'
+                  : 'border-gray-700 text-gray-400 hover:border-gray-600'
+              }`}>
+              {m.label}
             </button>
           ))}
         </div>

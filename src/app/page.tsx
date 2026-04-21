@@ -10,6 +10,9 @@ interface ProjectSummary {
   style: string
   status: string
   createdAt: number
+  panelCount?: number
+  charCount?: number
+  currentStep?: number
 }
 
 interface ModelSetting {
@@ -166,7 +169,7 @@ export default function HomePage() {
                         <span className="font-medium text-sm">{p.name || '未命名项目'}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${s.class}`}>{s.label}</span>
                       </div>
-                      <div className="text-xs text-gray-500">{p.style} · {new Date(p.createdAt).toLocaleDateString('zh-CN')}</div>
+                      <div className="text-xs text-gray-500">{p.style} · {p.panelCount ?? 0} 格 · {p.charCount ?? 0} 角色 · 第 {(p.currentStep ?? 0) + 1} 步/共 5 步 · {new Date(p.createdAt).toLocaleDateString('zh-CN')}</div>
                     </div>
                   </Link>
                   {/* 操作按钮 */}

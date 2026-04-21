@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Shot } from '@/types'
 import { db } from '@/lib/db'
 import { projects, characters, panels } from '@/lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
@@ -47,12 +48,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const body = await req.json()
-    const { script, style, name } = body as { script?: string; style?: string; name?: string }
+    const { script, style, name, currentStep, furthestStep, shots, imageModel } = body as {
+      script?: string
+      style?: string
+      name?: string
+      currentStep?: number
+      furthestStep?: number
+      shots?: string | Shot[]
+      imageModel?: string
+    }
 
     const updates: Record<string, unknown> = {}
     if (script !== undefined) updates.script = script
     if (style !== undefined) updates.style = style
     if (name !== undefined) updates.name = name
+    if (currentStep !== undefined) updates.currentStep = currentStep
+    if (furthestStep !== undefined) updates.furthestStep = furthestStep
+    if (shots !== undefined) updates.shots = typeof shots === 'string' ? shots : JSON.stringify(shots)
+    if (imageModel !== undefined) updates.imageModel = imageModel
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })

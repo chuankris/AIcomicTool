@@ -15,6 +15,13 @@
       "when": 1776668934093,
       "tag": "0001_curious_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776765263033,
+      "tag": "0002_perfect_anthem",
+      "breakpoints": true
     }
   ]
 }

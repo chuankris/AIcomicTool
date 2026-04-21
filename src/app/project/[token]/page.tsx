@@ -2,262 +2,293 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import useSWR from 'swr'
+import Stepper from '@/components/project/Stepper'
+import StepFooter from '@/components/project/StepFooter'
 import { CharacterManager } from '@/components/project/CharacterManager'
 import { ScriptEditor } from '@/components/project/ScriptEditor'
-import { ConfigPanel } from '@/components/project/ConfigPanel'
+import ShotListEditor from '@/components/project/ShotListEditor'
 import { PanelCard } from '@/components/project/PanelCard'
-import type { ProjectWithDetails, Character } from '@/types'
-
-type Tab = 'chars' | 'script' | 'config' | 'panels'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
-
-const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  draft:      { label: '草稿',   class: 'bg-gray-800 text-gray-400' },
-  pending:    { label: '待生成', class: 'bg-gray-800 text-gray-400' },
-  generating: { label: '⏳ 生成中', class: 'bg-yellow-900/40 text-yellow-400' },
-  reviewing:  { label: '✅ 待审核', class: 'bg-blue-900/40 text-blue-400' },
-  done:       { label: '🎉 完成', class: 'bg-green-900/40 text-green-400' },
-  failed:     { label: '生成失败', class: 'bg-red-900/40 text-red-400' },
-}
+import type { Panel, Shot, ImageModel, ProjectWithDetails, Character } from '@/types'
 
 export default function ProjectPage() {
   const { token } = useParams<{ token: string }>()
-  const [activeTab, setActiveTab] = useState<Tab>('chars')
+  const [project, setProject] = useState<ProjectWithDetails | null>(null)
+  const [step, setStep] = useState(0)
+  const [furthest, setFurthest] = useState(0)
+  const [shots, setShots] = useState<Shot[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
-  const [script, setScript] = useState('')
-  const [style, setStyle] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generateError, setGenerateError] = useState<string | null>(null)
-
-  const [selectedPanels, setSelectedPanels] = useState<Record<number, string>>({})
   const [reviewMode, setReviewMode] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
-  const { data: project, mutate, error: fetchError } = useSWR<ProjectWithDetails>(
-    `/api/projects/${token}`,
-    fetcher,
-    {
-      refreshInterval: (data) => {
-        if (!data) return 3000
-        const hasActive = data.panels?.some(p => p.status === 'generating' || p.status === 'pending')
-        return hasActive ? 3000 : 0
-      },
-    }
-  )
+  const [selectedPanels, setSelectedPanels] = useState<Set<number>>(new Set())
+  const [generating, setGenerating] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (project) {
-      setCharacters(project.characters ?? [])
-      setScript(project.script ?? '')
-      setStyle(project.style ?? '日漫')
-      if (project.status === 'generating' || project.status === 'reviewing' || project.status === 'done') {
-        setActiveTab('panels')
-      }
-    }
-  }, [project?.token])
-
-  const canGenerate = script.trim().length > 0 && project?.status === 'draft'
-
-  async function handleGenerate() {
-    setIsGenerating(true)
-    setGenerateError(null)
-    try {
-      const res = await fetch(`/api/projects/${token}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+    fetch(`/api/projects/${token}`)
+      .then(r => r.json())
+      .then((data: ProjectWithDetails) => {
+        setProject(data)
+        setCharacters(data.characters ?? [])
+        setStep(data.currentStep ?? 0)
+        setFurthest(data.furthestStep ?? 0)
+        setShots(data.shots ? (() => { try { return JSON.parse(data.shots) } catch { return [] } })() : [])
+        setLoading(false)
+        if (data.status === 'generating') startPolling()
       })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error ?? '生成失败')
-      }
-      setActiveTab('panels')
-      mutate()
-    } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : '启动生成失败')
-    } finally {
-      setIsGenerating(false)
-    }
+      .catch(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+
+  // Poll panels during generation
+  let pollInterval: ReturnType<typeof setInterval> | null = null
+  function startPolling() {
+    if (pollInterval) return
+    pollInterval = setInterval(() => {
+      fetch(`/api/projects/${token}`)
+        .then(r => r.json())
+        .then((data: ProjectWithDetails) => {
+          setProject(data)
+          if (data.status !== 'generating') {
+            clearInterval(pollInterval!)
+            pollInterval = null
+            setGenerating(false)
+          }
+        })
+        .catch(() => {})
+    }, 2000)
   }
 
-  function toggleSelect(id: number) {
-    setSelectedPanels(prev => {
-      if (id in prev) { const next = { ...prev }; delete next[id]; return next }
-      return { ...prev, [id]: '' }
+  function goToStep(n: number) {
+    const newFurthest = Math.max(furthest, n)
+    setStep(n)
+    setFurthest(newFurthest)
+    fetch(`/api/projects/${token}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentStep: n, furthestStep: newFurthest }),
     })
   }
-  function setFeedback(id: number, text: string) {
-    setSelectedPanels(prev => ({ ...prev, [id]: text }))
-  }
-  const hasFilledFeedback = Object.values(selectedPanels).some(f => f.trim())
 
-  async function submitReview() {
-    const reviews = Object.entries(selectedPanels)
-      .filter(([, f]) => f.trim())
-      .map(([panelId, feedback]) => ({ panelId: parseInt(panelId), feedback }))
-    if (!reviews.length) return
-    setIsSubmitting(true); setSubmitError(null)
+  async function startGeneration() {
+    if (!project) return
+    setGenerating(true)
     try {
-      const res = await fetch(`/api/projects/${token}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviews }),
-      })
-      if (!res.ok) throw new Error('提交审核失败，请重试')
-      setSelectedPanels({}); setReviewMode(false); mutate()
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : '提交失败')
-    } finally {
-      setIsSubmitting(false)
+      await fetch(`/api/projects/${token}/generate`, { method: 'POST' })
+      startPolling()
+    } catch {
+      setGenerating(false)
     }
   }
 
-  if (fetchError) return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-      <p className="text-red-400">加载失败，请刷新页面重试</p>
-    </div>
-  )
-  if (!project) return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">加载中...</div>
-  )
+  function togglePanelSelect(id: number) {
+    setSelectedPanels(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
-  const statusInfo = STATUS_MAP[project.status] ?? { label: project.status, class: 'bg-gray-800 text-gray-400' }
+  async function batchRegenerate() {
+    const ids = Array.from(selectedPanels)
+    for (const id of ids) {
+      await fetch(`/api/panels/${id}/regenerate`, { method: 'POST' })
+    }
+    setSelectedPanels(new Set())
+    setReviewMode(false)
+    fetch(`/api/projects/${token}`).then(r => r.json()).then(setProject)
+  }
+
+  async function handlePanelModelChange(id: number, model: ImageModel) {
+    await fetch(`/api/panels/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageModel: model }),
+    })
+    setProject(prev => prev ? {
+      ...prev,
+      panels: prev.panels.map(p => p.id === id ? { ...p, imageModel: model } : p)
+    } : prev)
+  }
+
+  async function handlePanelRegenerate(id: number) {
+    setProject(prev => prev ? {
+      ...prev,
+      panels: prev.panels.map(p => p.id === id ? { ...p, status: 'generating' as Panel['status'] } : p)
+    } : prev)
+    await fetch(`/api/panels/${id}/regenerate`, { method: 'POST' })
+    const data = await fetch(`/api/projects/${token}`).then(r => r.json())
+    setProject(data)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <p className="mb-4">项目不存在</p>
+          <Link href="/" className="text-violet-400 hover:underline">← 返回首页</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const STATUS_LABELS: Record<string, string> = {
+    draft: '草稿', generating: '生成中', reviewing: '待审核', done: '完成', failed: '失败'
+  }
+  const STATUS_CLASSES: Record<string, string> = {
+    draft: 'bg-gray-800 text-gray-400',
+    generating: 'bg-yellow-900/40 text-yellow-400',
+    reviewing: 'bg-blue-900/40 text-blue-400',
+    done: 'bg-green-900/40 text-green-400',
+    failed: 'bg-red-900/40 text-red-400',
+  }
+
   const panels = project.panels ?? []
-  const allSettled = panels.length > 0 && panels.every(p => p.status === 'done' || p.status === 'failed')
-  const selectedIds = Object.keys(selectedPanels).map(Number)
+  const doneCount = panels.filter(p => p.status === 'done').length
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'chars', label: '角色设定' },
-    { id: 'script', label: '剧本' },
-    { id: 'config', label: '配置' },
-    { id: 'panels', label: `分镜${panels.length > 0 ? ` (${panels.length})` : ''}` },
-  ]
+  const nextDisabled: Record<number, boolean> = {
+    0: false,
+    1: false,
+    2: shots.length === 0,
+    3: false,
+    4: false,
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <header className="border-b border-gray-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      {/* Header */}
+      <header className="border-b border-gray-800 px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-gray-500 hover:text-gray-300 text-sm">← 项目列表</Link>
-          <span className="text-gray-700">|</span>
-          <span className="text-sm font-medium">{project.name ?? '未命名项目'}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.class}`}>{statusInfo.label}</span>
+          <Link href="/" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">←</Link>
+          <h1 className="text-sm font-medium text-gray-200">{project.name || '未命名项目'}</h1>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASSES[project.status] ?? 'bg-gray-800 text-gray-400'}`}>
+            {STATUS_LABELS[project.status] ?? project.status}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          {generateError && <p className="text-red-400 text-xs">{generateError}</p>}
-          {canGenerate && (
-            <button onClick={handleGenerate} disabled={isGenerating}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
-              {isGenerating ? '启动中...' : '✨ 开始生成'}
-            </button>
-          )}
-          {activeTab === 'panels' && allSettled && !reviewMode && (
-            <button onClick={() => setReviewMode(true)}
-              className="px-4 py-2 border border-yellow-600 text-yellow-400 rounded-lg text-sm hover:bg-yellow-900/20">
-              标记修改
-            </button>
-          )}
-          {activeTab === 'panels' && reviewMode && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-400">已选 {selectedIds.length} 格</span>
-              <button onClick={() => { setReviewMode(false); setSelectedPanels({}) }}
-                className="px-3 py-1.5 border border-gray-700 rounded-lg text-sm">取消</button>
-              <button onClick={submitReview} disabled={isSubmitting || !hasFilledFeedback}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 rounded-lg text-sm">
-                {isSubmitting ? '提交中...' : '提交审核'}
-              </button>
-            </div>
-          )}
-        </div>
+        {step === 3 && (
+          <div className="flex items-center gap-2">
+            {reviewMode ? (
+              <>
+                <span className="text-xs text-gray-500">{selectedPanels.size} 格已选</span>
+                <button
+                  onClick={batchRegenerate}
+                  disabled={selectedPanels.size === 0}
+                  className="px-3 py-1.5 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-40 rounded-lg transition-colors"
+                >
+                  批量重生成
+                </button>
+                <button
+                  onClick={() => { setReviewMode(false); setSelectedPanels(new Set()) }}
+                  className="px-3 py-1.5 text-xs border border-gray-700 hover:border-gray-500 rounded-lg transition-colors text-gray-400"
+                >
+                  取消
+                </button>
+              </>
+            ) : (
+              <>
+                {project.status === 'draft' && (
+                  <button
+                    onClick={startGeneration}
+                    disabled={generating || panels.length > 0}
+                    className="px-3 py-1.5 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-40 rounded-lg font-medium transition-colors"
+                  >
+                    {generating ? '生成中...' : '✨ 开始生成'}
+                  </button>
+                )}
+                {panels.length > 0 && (
+                  <button
+                    onClick={() => setReviewMode(true)}
+                    className="px-3 py-1.5 text-xs border border-gray-700 hover:border-gray-500 rounded-lg transition-colors text-gray-400"
+                  >
+                    标记修改
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </header>
 
-      <div className="flex border-b border-gray-800 flex-shrink-0">
-        {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 text-sm transition-colors border-b-2 -mb-px ${
-              activeTab === tab.id
-                ? 'text-purple-400 border-purple-500 font-medium'
-                : 'text-gray-500 border-transparent hover:text-gray-300'
-            }`}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Stepper */}
+      <Stepper currentStep={step} furthestStep={furthest} onStepClick={goToStep} />
 
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6">
-
-          {activeTab === 'chars' && (
-            <CharacterManager
-              token={token}
-              characters={characters}
-              onCharactersChange={setCharacters}
-            />
-          )}
-
-          {activeTab === 'script' && (
-            <ScriptEditor
-              token={token}
-              initialScript={script}
-              onSave={setScript}
-            />
-          )}
-
-          {activeTab === 'config' && (
-            <ConfigPanel
-              token={token}
-              initialStyle={style}
-              onStyleChange={setStyle}
-            />
-          )}
-
-          {activeTab === 'panels' && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                {panels.length > 0 && (
-                  <span className="text-sm text-gray-500">
-                    {panels.filter(p => p.status === 'done').length} / {panels.length} 格完成
-                  </span>
-                )}
+      {/* Main content */}
+      <div className="flex-1 overflow-auto max-w-3xl w-full mx-auto px-6 py-6">
+        {step === 0 && (
+          <ScriptEditor
+            token={token}
+            initialScript={project.script}
+            onSave={(s: string) => setProject(prev => prev ? { ...prev, script: s } : prev)}
+          />
+        )}
+        {step === 1 && (
+          <CharacterManager
+            token={token}
+            characters={characters}
+            onCharactersChange={setCharacters}
+          />
+        )}
+        {step === 2 && (
+          <ShotListEditor
+            projectToken={token}
+            initialShots={shots}
+            onShotsChange={setShots}
+          />
+        )}
+        {step === 3 && (
+          <div>
+            {panels.length === 0 && !generating ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                <div className="text-4xl">🎬</div>
+                <p className="text-sm text-gray-500">点击右上角「✨ 开始生成」生成分镜图像</p>
               </div>
-              {submitError && <p className="text-red-400 text-sm mb-3">{submitError}</p>}
-              {panels.length === 0 ? (
-                <div className="text-center py-16 text-gray-600">
-                  <div className="text-3xl mb-3">🎬</div>
-                  <p className="text-sm">还没有分镜</p>
-                  {project.status === 'draft' && (
-                    <p className="text-xs mt-2">填写剧本后点击「开始生成」</p>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            ) : (
+              <>
+                {panels.length > 0 && (
+                  <p className="text-xs text-gray-500 mb-4">{doneCount} / {panels.length} 格完成</p>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {panels.map(panel => (
-                    <div key={panel.id}>
-                      <PanelCard
-                        panel={panel}
-                        isSelected={panel.id in selectedPanels}
-                        onToggleSelect={toggleSelect}
-                        reviewMode={reviewMode}
-                      />
-                      {reviewMode && panel.id in selectedPanels && (
-                        <textarea
-                          placeholder="描述问题（如：头发颜色不对）"
-                          value={selectedPanels[panel.id]}
-                          onChange={e => setFeedback(panel.id, e.target.value)}
-                          className="w-full mt-2 bg-gray-900 border border-red-700/50 rounded p-2 text-xs text-gray-200 resize-none h-16 focus:outline-none focus:border-red-500"
-                        />
-                      )}
-                    </div>
+                    <PanelCard
+                      key={panel.id}
+                      panel={panel}
+                      reviewMode={reviewMode}
+                      isSelected={selectedPanels.has(panel.id)}
+                      onToggleSelect={togglePanelSelect}
+                      onRegenerate={handlePanelRegenerate}
+                      onModelChange={handlePanelModelChange}
+                    />
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-
-        </div>
+              </>
+            )}
+          </div>
+        )}
+        {step === 4 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+            <div className="text-4xl">⏳</div>
+            <p className="text-sm text-gray-400 font-medium">配音 & 导出</p>
+            <p className="text-xs text-gray-600">该功能即将上线，敬请期待</p>
+          </div>
+        )}
       </div>
+
+      {/* Step footer */}
+      <StepFooter
+        step={step}
+        totalSteps={5}
+        onPrev={() => goToStep(step - 1)}
+        onNext={() => goToStep(step + 1)}
+        nextDisabled={nextDisabled[step]}
+        hint={step === 2 && shots.length === 0 ? '请先生成分镜脚本' : undefined}
+      />
     </div>
   )
 }

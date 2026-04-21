@@ -10,6 +10,10 @@ export const projects = sqliteTable('projects', {
   status: text('status').notNull().default('draft'),
   videoUrl: text('video_url'),
   createdAt: integer('created_at').notNull(),
+  currentStep: integer('current_step').notNull().default(0),
+  furthestStep: integer('furthest_step').notNull().default(0),
+  shots: text('shots').notNull().default(''),
+  imageModel: text('image_model').notNull().default('jimeng'),
 })
 
 export const characters = sqliteTable('characters', {
@@ -35,6 +39,7 @@ export const panels = sqliteTable('panels', {
   reviewFeedback: text('review_feedback'),
   revision: integer('revision').notNull().default(0),
   status: text('status').notNull().default('pending'),
+  imageModel: text('image_model').notNull().default('jimeng'),
 })
 
 export const settings = sqliteTable('settings', {

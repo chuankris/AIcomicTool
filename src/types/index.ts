@@ -1,4 +1,15 @@
 export type ProjectStatus = 'draft' | 'pending' | 'generating' | 'reviewing' | 'done' | 'failed'
+
+export interface Shot {
+  index: number
+  sceneDesc: string
+  characters: string[]
+  dialogue: string
+  emotion: string
+  composition: string
+}
+
+export type ImageModel = 'jimeng' | 'mj-niji' | 'sd-xl' | 'kling'
 export type PanelStatus = 'pending' | 'generating' | 'done' | 'failed'
 export type CharacterType = 'character' | 'background'
 
@@ -29,6 +40,10 @@ export interface Project {
   status: ProjectStatus
   videoUrl: string | null
   createdAt: number
+  currentStep: number
+  furthestStep: number
+  shots: string
+  imageModel: string
 }
 
 export interface Character {
@@ -54,6 +69,7 @@ export interface Panel {
   reviewFeedback: string | null
   revision: number
   status: PanelStatus
+  imageModel: string
 }
 
 export interface ParsedPanel {
