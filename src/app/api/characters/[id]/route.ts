@@ -7,6 +7,19 @@ import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { CharacterAttributes } from '@/types'
 
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idStr } = await params
+  const id = parseInt(idStr, 10)
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  try {
+    const deleted = await db.delete(characters).where(eq(characters.id, id)).returning()
+    if (!deleted.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: idStr } = await params
