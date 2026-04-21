@@ -24,6 +24,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   }
 }
 
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
+  try {
+    const [project] = await db.select().from(projects).where(eq(projects.token, token))
+    if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    await db.delete(panels).where(eq(panels.projectId, project.id))
+    await db.delete(characters).where(eq(characters.projectId, project.id))
+    await db.delete(projects).where(eq(projects.token, token))
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('[projects DELETE]', e)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   try {
