@@ -9,7 +9,7 @@ import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
 import type { ModelConfig, Character, Shot } from '@/types'
 
-const CONCURRENCY = 3
+const CONCURRENCY = 1
 
 async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const results: T[] = []

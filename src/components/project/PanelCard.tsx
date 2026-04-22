@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Panel, ImageModel } from '@/types'
 import ModelSwitcherMenu from '@/components/ui/ModelSwitcherMenu'
+import { Lightbox } from '@/components/ui/Lightbox'
 
 interface Props {
   panel: Panel
@@ -59,7 +60,7 @@ export function PanelCard({
         {displayStatus === 'generating' ? (
           <div className="w-full h-full flex items-center justify-center text-yellow-500 text-sm">生成中...</div>
         ) : panel.status === 'done' && panel.imageUrl ? (
-          <img src={panel.imageUrl} alt={`分镜 ${panel.index}`} className="w-full h-full object-cover" />
+          <Lightbox src={panel.imageUrl} alt={`分镜 ${panel.index}`} className="w-full h-full object-cover" />
         ) : panel.status === 'failed' ? (
           <div className="w-full h-full flex items-center justify-center text-red-500 text-sm">生成失败</div>
         ) : (

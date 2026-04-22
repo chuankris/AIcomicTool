@@ -10,6 +10,9 @@ import ShotListEditor from '@/components/project/ShotListEditor'
 import { PanelCard } from '@/components/project/PanelCard'
 import type { Panel, Shot, ImageModel, ProjectWithDetails, Character } from '@/types'
 
+// 4 steps: 剧本&角色 / 分镜脚本 / 出图 / 配音&导出
+const TOTAL_STEPS = 4
+
 export default function ProjectPage() {
   const { token } = useParams<{ token: string }>()
   const [project, setProject] = useState<ProjectWithDetails | null>(null)
@@ -21,6 +24,7 @@ export default function ProjectPage() {
   const [selectedPanels, setSelectedPanels] = useState<Set<number>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [script, setScript] = useState('')
 
   useEffect(() => {
     fetch(`/api/projects/${token}`)
@@ -28,8 +32,12 @@ export default function ProjectPage() {
       .then((data: ProjectWithDetails) => {
         setProject(data)
         setCharacters(data.characters ?? [])
-        setStep(data.currentStep ?? 0)
-        setFurthest(data.furthestStep ?? 0)
+        // Clamp stored step to new 4-step range
+        const s = Math.min(data.currentStep ?? 0, TOTAL_STEPS - 1)
+        const f = Math.min(data.furthestStep ?? 0, TOTAL_STEPS - 1)
+        setStep(s)
+        setFurthest(f)
+        setScript(data.script ?? '')
         setShots(data.shots ? (() => { try { return JSON.parse(data.shots) } catch { return [] } })() : [])
         setLoading(false)
         if (data.status === 'generating') startPolling()
@@ -38,7 +46,6 @@ export default function ProjectPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // Poll panels during generation
   let pollInterval: ReturnType<typeof setInterval> | null = null
   function startPolling() {
     if (pollInterval) return
@@ -153,12 +160,14 @@ export default function ProjectPage() {
   const panels = project.panels ?? []
   const doneCount = panels.filter(p => p.status === 'done').length
 
+  // Step 2 = 出图 (was step 3)
+  const isGenerateStep = step === 2
+
   const nextDisabled: Record<number, boolean> = {
     0: false,
-    1: false,
-    2: shots.length === 0,
+    1: shots.length === 0,
+    2: false,
     3: false,
-    4: false,
   }
 
   return (
@@ -172,7 +181,7 @@ export default function ProjectPage() {
             {STATUS_LABELS[project.status] ?? project.status}
           </span>
         </div>
-        {step === 3 && (
+        {isGenerateStep && (
           <div className="flex items-center gap-2">
             {reviewMode ? (
               <>
@@ -221,28 +230,40 @@ export default function ProjectPage() {
 
       {/* Main content */}
       <div className="flex-1 overflow-auto max-w-3xl w-full mx-auto px-6 py-6">
+        {/* Step 0: 剧本 & 角色 */}
         {step === 0 && (
-          <ScriptEditor
-            token={token}
-            initialScript={project.script}
-            onSave={(s: string) => setProject(prev => prev ? { ...prev, script: s } : prev)}
-          />
+          <div className="space-y-6">
+            <ScriptEditor
+              token={token}
+              initialScript={project.script}
+              onSave={(s: string) => {
+                setScript(s)
+                setProject(prev => prev ? { ...prev, script: s } : prev)
+              }}
+            />
+            <div className="border-t border-gray-800 pt-6">
+              <h2 className="text-sm font-medium text-gray-300 mb-4">角色 & 背景场景</h2>
+              <CharacterManager
+                token={token}
+                script={script}
+                characters={characters}
+                onCharactersChange={setCharacters}
+              />
+            </div>
+          </div>
         )}
+
+        {/* Step 1: 分镜脚本 */}
         {step === 1 && (
-          <CharacterManager
-            token={token}
-            characters={characters}
-            onCharactersChange={setCharacters}
-          />
-        )}
-        {step === 2 && (
           <ShotListEditor
             projectToken={token}
             initialShots={shots}
             onShotsChange={setShots}
           />
         )}
-        {step === 3 && (
+
+        {/* Step 2: 出图 */}
+        {step === 2 && (
           <div>
             {panels.length === 0 && !generating ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
@@ -271,7 +292,9 @@ export default function ProjectPage() {
             )}
           </div>
         )}
-        {step === 4 && (
+
+        {/* Step 3: 配音 & 导出 */}
+        {step === 3 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
             <div className="text-4xl">⏳</div>
             <p className="text-sm text-gray-400 font-medium">配音 & 导出</p>
@@ -283,11 +306,11 @@ export default function ProjectPage() {
       {/* Step footer */}
       <StepFooter
         step={step}
-        totalSteps={5}
+        totalSteps={TOTAL_STEPS}
         onPrev={() => goToStep(step - 1)}
         onNext={() => goToStep(step + 1)}
         nextDisabled={nextDisabled[step]}
-        hint={step === 2 && shots.length === 0 ? '请先生成分镜脚本' : undefined}
+        hint={step === 1 && shots.length === 0 ? '请先生成分镜脚本' : undefined}
       />
     </div>
   )
