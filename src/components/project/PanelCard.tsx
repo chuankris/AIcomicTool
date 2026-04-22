@@ -52,11 +52,11 @@ export function PanelCard({
           onSelect?.(panel.id)
         }
       }}
-      className={`relative rounded-lg border-2 overflow-hidden bg-gray-900 transition-all group ${
+      className={`relative rounded-lg border-2 bg-gray-900 transition-all group ${
         effectiveSelected ? 'border-red-500 ring-2 ring-red-500' : statusColors[displayStatus]
       } ${reviewMode ? 'cursor-pointer' : ''}`}
     >
-      <div className="aspect-[9/16]">
+      <div className="aspect-[9/16] overflow-hidden rounded-md">
         {displayStatus === 'generating' ? (
           <div className="w-full h-full flex items-center justify-center text-yellow-500 text-sm">生成中...</div>
         ) : panel.status === 'done' && panel.imageUrl ? (

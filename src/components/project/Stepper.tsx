@@ -1,6 +1,6 @@
 'use client'
 
-const STEPS = ['剧本 & 角色', '分镜脚本', '出图', '配音 & 导出']
+const STEPS = ['剧本 & 角色', '分镜 & 出图', '导出']
 
 interface Props {
   currentStep: number

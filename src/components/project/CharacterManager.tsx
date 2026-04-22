@@ -172,12 +172,12 @@ export function CharacterManager({ token, script, characters, onCharactersChange
                 <div className="relative w-16 h-20 flex-shrink-0 group/img">
                   <Lightbox src={char.referenceImageUrl} alt={char.name} className="w-full h-full object-cover rounded" />
                   <button
-                    onClick={() => handleRegenChar(char.id)}
+                    onClick={e => { e.stopPropagation(); handleRegenChar(char.id) }}
                     disabled={regenId === char.id}
-                    className="absolute inset-0 bg-black/60 rounded opacity-0 group-hover/img:opacity-100 flex items-center justify-center text-white text-lg transition-opacity disabled:opacity-100"
+                    className="absolute bottom-0.5 right-0.5 w-5 h-5 bg-black/70 hover:bg-black rounded flex items-center justify-center text-white text-xs opacity-0 group-hover/img:opacity-100 transition-opacity disabled:opacity-100"
                     title="重新生成"
                   >
-                    {regenId === char.id ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+                    {regenId === char.id ? <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
                   </button>
                 </div>
               ) : (

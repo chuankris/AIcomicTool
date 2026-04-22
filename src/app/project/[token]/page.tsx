@@ -6,12 +6,10 @@ import Stepper from '@/components/project/Stepper'
 import StepFooter from '@/components/project/StepFooter'
 import { CharacterManager } from '@/components/project/CharacterManager'
 import { ScriptEditor } from '@/components/project/ScriptEditor'
-import ShotListEditor from '@/components/project/ShotListEditor'
-import { PanelCard } from '@/components/project/PanelCard'
-import type { Panel, Shot, ImageModel, ProjectWithDetails, Character } from '@/types'
+import ShotPanelEditor from '@/components/project/ShotPanelEditor'
+import type { Panel, Shot, ProjectWithDetails, Character } from '@/types'
 
-// 4 steps: 剧本&角色 / 分镜脚本 / 出图 / 配音&导出
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 3
 
 export default function ProjectPage() {
   const { token } = useParams<{ token: string }>()
@@ -20,8 +18,6 @@ export default function ProjectPage() {
   const [furthest, setFurthest] = useState(0)
   const [shots, setShots] = useState<Shot[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
-  const [reviewMode, setReviewMode] = useState(false)
-  const [selectedPanels, setSelectedPanels] = useState<Set<number>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [script, setScript] = useState('')
@@ -32,7 +28,6 @@ export default function ProjectPage() {
       .then((data: ProjectWithDetails) => {
         setProject(data)
         setCharacters(data.characters ?? [])
-        // Clamp stored step to new 4-step range
         const s = Math.min(data.currentStep ?? 0, TOTAL_STEPS - 1)
         const f = Math.min(data.furthestStep ?? 0, TOTAL_STEPS - 1)
         setStep(s)
@@ -40,7 +35,10 @@ export default function ProjectPage() {
         setScript(data.script ?? '')
         setShots(data.shots ? (() => { try { return JSON.parse(data.shots) } catch { return [] } })() : [])
         setLoading(false)
-        if (data.status === 'generating') startPolling()
+        if (data.status === 'generating') {
+          setGenerating(true)
+          startPolling()
+        }
       })
       .catch(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,44 +84,20 @@ export default function ProjectPage() {
     }
   }
 
-  function togglePanelSelect(id: number) {
-    setSelectedPanels(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  async function batchRegenerate() {
-    const ids = Array.from(selectedPanels)
-    for (const id of ids) {
-      await fetch(`/api/panels/${id}/regenerate`, { method: 'POST' })
-    }
-    setSelectedPanels(new Set())
-    setReviewMode(false)
-    fetch(`/api/projects/${token}`).then(r => r.json()).then(setProject)
-  }
-
-  async function handlePanelModelChange(id: number, model: ImageModel) {
-    await fetch(`/api/panels/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageModel: model }),
-    })
+  function handlePanelUpdate(updated: Panel) {
     setProject(prev => prev ? {
       ...prev,
-      panels: prev.panels.map(p => p.id === id ? { ...p, imageModel: model } : p)
+      panels: prev.panels.map(p => p.id === updated.id ? updated : p),
     } : prev)
   }
 
   async function handlePanelRegenerate(id: number) {
     setProject(prev => prev ? {
       ...prev,
-      panels: prev.panels.map(p => p.id === id ? { ...p, status: 'generating' as Panel['status'] } : p)
+      panels: prev.panels.map(p => p.id === id ? { ...p, status: 'generating' as Panel['status'] } : p),
     } : prev)
     await fetch(`/api/panels/${id}/regenerate`, { method: 'POST' })
-    const data = await fetch(`/api/projects/${token}`).then(r => r.json())
+    const data: ProjectWithDetails = await fetch(`/api/projects/${token}`).then(r => r.json())
     setProject(data)
   }
 
@@ -147,7 +121,7 @@ export default function ProjectPage() {
   }
 
   const STATUS_LABELS: Record<string, string> = {
-    draft: '草稿', generating: '生成中', reviewing: '待审核', done: '完成', failed: '失败'
+    draft: '草稿', generating: '生成中', reviewing: '待审核', done: '完成', failed: '失败',
   }
   const STATUS_CLASSES: Record<string, string> = {
     draft: 'bg-gray-800 text-gray-400',
@@ -158,77 +132,25 @@ export default function ProjectPage() {
   }
 
   const panels = project.panels ?? []
-  const doneCount = panels.filter(p => p.status === 'done').length
-
-  // Step 2 = 出图 (was step 3)
-  const isGenerateStep = step === 2
 
   const nextDisabled: Record<number, boolean> = {
     0: false,
-    1: shots.length === 0,
+    1: false,
     2: false,
-    3: false,
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">←</Link>
-          <h1 className="text-sm font-medium text-gray-200">{project.name || '未命名项目'}</h1>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASSES[project.status] ?? 'bg-gray-800 text-gray-400'}`}>
-            {STATUS_LABELS[project.status] ?? project.status}
-          </span>
-        </div>
-        {isGenerateStep && (
-          <div className="flex items-center gap-2">
-            {reviewMode ? (
-              <>
-                <span className="text-xs text-gray-500">{selectedPanels.size} 格已选</span>
-                <button
-                  onClick={batchRegenerate}
-                  disabled={selectedPanels.size === 0}
-                  className="px-3 py-1.5 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-40 rounded-lg transition-colors"
-                >
-                  批量重生成
-                </button>
-                <button
-                  onClick={() => { setReviewMode(false); setSelectedPanels(new Set()) }}
-                  className="px-3 py-1.5 text-xs border border-gray-700 hover:border-gray-500 rounded-lg transition-colors text-gray-400"
-                >
-                  取消
-                </button>
-              </>
-            ) : (
-              <>
-                {project.status === 'draft' && (
-                  <button
-                    onClick={startGeneration}
-                    disabled={generating || panels.length > 0}
-                    className="px-3 py-1.5 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-40 rounded-lg font-medium transition-colors"
-                  >
-                    {generating ? '生成中...' : '✨ 开始生成'}
-                  </button>
-                )}
-                {panels.length > 0 && (
-                  <button
-                    onClick={() => setReviewMode(true)}
-                    className="px-3 py-1.5 text-xs border border-gray-700 hover:border-gray-500 rounded-lg transition-colors text-gray-400"
-                  >
-                    标记修改
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+      <header className="border-b border-gray-800 px-6 py-3 flex items-center gap-3 shrink-0">
+        <Link href="/" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">←</Link>
+        <h1 className="text-sm font-medium text-gray-200">{project.name || '未命名项目'}</h1>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASSES[project.status] ?? 'bg-gray-800 text-gray-400'}`}>
+          {STATUS_LABELS[project.status] ?? project.status}
+        </span>
       </header>
 
-      {/* Stepper */}
       <Stepper currentStep={step} furthestStep={furthest} onStepClick={goToStep} />
 
-      {/* Main content */}
       <div className="flex-1 overflow-auto max-w-3xl w-full mx-auto px-6 py-6">
         {/* Step 0: 剧本 & 角色 */}
         {step === 0 && (
@@ -253,48 +175,24 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Step 1: 分镜脚本 */}
+        {/* Step 1: 分镜 & 出图 */}
         {step === 1 && (
-          <ShotListEditor
+          <ShotPanelEditor
             projectToken={token}
-            initialShots={shots}
+            shots={shots}
+            panels={panels}
+            characters={characters}
             onShotsChange={setShots}
+            onGenerate={startGeneration}
+            onPanelUpdate={handlePanelUpdate}
+            onPanelRegenerate={handlePanelRegenerate}
+            generating={generating}
+            projectStatus={project.status}
           />
         )}
 
-        {/* Step 2: 出图 */}
+        {/* Step 2: 导出 */}
         {step === 2 && (
-          <div>
-            {panels.length === 0 && !generating ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                <div className="text-4xl">🎬</div>
-                <p className="text-sm text-gray-500">点击右上角「✨ 开始生成」生成分镜图像</p>
-              </div>
-            ) : (
-              <>
-                {panels.length > 0 && (
-                  <p className="text-xs text-gray-500 mb-4">{doneCount} / {panels.length} 格完成</p>
-                )}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {panels.map(panel => (
-                    <PanelCard
-                      key={panel.id}
-                      panel={panel}
-                      reviewMode={reviewMode}
-                      isSelected={selectedPanels.has(panel.id)}
-                      onToggleSelect={togglePanelSelect}
-                      onRegenerate={handlePanelRegenerate}
-                      onModelChange={handlePanelModelChange}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Step 3: 配音 & 导出 */}
-        {step === 3 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
             <div className="text-4xl">⏳</div>
             <p className="text-sm text-gray-400 font-medium">配音 & 导出</p>
@@ -303,14 +201,12 @@ export default function ProjectPage() {
         )}
       </div>
 
-      {/* Step footer */}
       <StepFooter
         step={step}
         totalSteps={TOTAL_STEPS}
         onPrev={() => goToStep(step - 1)}
         onNext={() => goToStep(step + 1)}
         nextDisabled={nextDisabled[step]}
-        hint={step === 1 && shots.length === 0 ? '请先生成分镜脚本' : undefined}
       />
     </div>
   )
