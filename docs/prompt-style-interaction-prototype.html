@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>提示词与风格交互原型</title>
+  <style>
+    :root{--bg:#030712;--panel:#0b1220;--card:#111827;--line:#283244;--line2:#374151;--text:#f9fafb;--muted:#9ca3af;--sub:#6b7280;--v:#7c3aed;--v2:#a78bfa;--v3:#c4b5fd;--amber:#f59e0b;--green:#34d399;--r:8px}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0%,rgba(124,58,237,.14),transparent 34rem),linear-gradient(180deg,#050916,var(--bg));color:var(--text);font:13px/1.5 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0}
+    button,textarea{font:inherit}button{cursor:pointer}.app{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)340px}.side{border-right:1px solid var(--line);padding:20px 16px;background:rgba(3,7,18,.85);position:sticky;top:0;height:100vh}.brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:32px;height:32px;border-radius:7px;display:grid;place-items:center;background:linear-gradient(135deg,var(--v),#4f46e5);font-weight:800}.brand b{color:var(--v2)}.brand small{display:block;color:var(--sub);margin-top:2px}.nav{display:grid;gap:8px}.nav button{border:1px solid transparent;background:transparent;color:var(--muted);border-radius:var(--r);padding:10px 11px;text-align:left;display:flex;justify-content:space-between}.nav button:hover{background:#111827;color:#e5e7eb}.nav button.on{border-color:rgba(124,58,237,.45);background:rgba(76,29,149,.3);color:var(--v3)}.note{position:absolute;left:16px;right:16px;bottom:18px;border:1px solid var(--line2);border-radius:var(--r);padding:12px;color:var(--muted);background:rgba(17,24,39,.7)}
+    main{min-width:0;padding:22px 28px 32px}.top{display:flex;justify-content:space-between;gap:16px;margin-bottom:20px}h1{font-size:18px;margin:0}.hint{color:var(--sub);font-size:12px;margin-top:4px}.badge{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;font-size:11px;color:var(--v3);background:rgba(76,29,149,.32);border:1px solid rgba(124,58,237,.28);white-space:nowrap}.stack{display:grid;gap:14px}.box{border:1px solid var(--line);border-radius:var(--r);background:rgba(11,18,32,.82);overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.3)}.head{padding:15px 16px 13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px}.title{font-weight:700}.sub{color:var(--sub);font-size:12px;margin-top:3px}.body{padding:16px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:grid;gap:8px;margin-bottom:16px}.field label{font-weight:600;color:#d1d5db;font-size:12px;display:flex;justify-content:space-between}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{min-height:32px;border:1px solid var(--line2);background:rgba(17,24,39,.84);color:#cbd5e1;border-radius:7px;padding:0 10px}.chip:hover{border-color:#4b5563}.chip.on{color:var(--v3);border-color:rgba(167,139,250,.68);background:rgba(76,29,149,.42)}.chip.warn.on{color:#fcd34d;border-color:rgba(245,158,11,.6);background:rgba(120,53,15,.35)}
+    textarea{width:100%;min-height:86px;resize:vertical;border:1px solid var(--line2);background:rgba(3,7,18,.72);color:#e5e7eb;border-radius:var(--r);padding:12px;outline:none}textarea:focus{border-color:var(--v2);box-shadow:0 0 0 3px rgba(124,58,237,.14)}.preview{border:1px solid rgba(124,58,237,.3);background:linear-gradient(180deg,rgba(49,46,129,.32),rgba(17,24,39,.72));border-radius:var(--r);padding:14px}.preview b{display:block;color:var(--v3);margin-bottom:8px}.ptext{color:#ddd6fe;line-height:1.75}.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}.btn{min-height:36px;border:1px solid var(--line2);border-radius:7px;padding:0 14px;background:#1f2937;color:#e5e7eb}.btn.primary{border-color:rgba(124,58,237,.72);background:var(--v);color:#fff;font-weight:700}.btn:hover{filter:brightness(1.08)}
+    .results{display:grid;gap:10px}.item{border:1px solid var(--line);background:rgba(17,24,39,.76);border-radius:var(--r);padding:12px}.meta{display:flex;justify-content:space-between;gap:10px;color:var(--sub);font-size:11px}.name{font-weight:700;color:#f3f4f6;font-size:13px}.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.tag{border:1px solid var(--line2);background:#1f2937;color:#cbd5e1;border-radius:999px;padding:3px 7px;font-size:11px}.hide{display:none}
+    .right{border-left:1px solid var(--line);background:rgba(3,7,18,.8);padding:20px 16px;position:sticky;top:0;height:100vh;overflow:auto}.phone{border:1px solid var(--line2);border-radius:18px;background:#020617;padding:10px;margin-bottom:16px;box-shadow:0 24px 80px rgba(0,0,0,.3)}.screen{aspect-ratio:9/16;border-radius:12px;border:1px solid #1f2937;position:relative;overflow:hidden;background:var(--art,linear-gradient(135deg,#1e1b4b,#111827 56%,#451a03))}.screen:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 16px)}.cap{position:absolute;left:12px;right:12px;bottom:12px;border:1px solid rgba(255,255,255,.14);background:rgba(2,6,23,.7);border-radius:8px;padding:10px;color:#fff;backdrop-filter:blur(10px)}
+    .chat{border:1px solid var(--line);border-radius:var(--r);background:rgba(11,18,32,.8);overflow:hidden}.chat h3{margin:0;padding:12px;border-bottom:1px solid var(--line);font-size:13px}.msgs{padding:12px;display:grid;gap:10px;max-height:250px;overflow:auto}.msg{padding:9px 10px;border-radius:8px;background:#1f2937;color:#d1d5db}.msg.user{margin-left:22px;background:rgba(76,29,149,.38);color:#ede9fe}.input{padding:10px;border-top:1px solid var(--line);display:grid;gap:8px}.quick{border:1px solid var(--line2);background:#111827;color:var(--muted);border-radius:999px;padding:5px 8px;font-size:11px;margin:0 5px 6px 0}
+    @media(max-width:1050px){.app{grid-template-columns:190px 1fr}.right{grid-column:1/-1;position:static;height:auto;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:260px 1fr;gap:16px}.phone{margin:0}}@media(max-width:720px){.app{display:block}.side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.note{position:static;margin-top:16px}main{padding:18px 14px}.top{display:block}.grid{grid-template-columns:1fr}.right{display:block;padding:16px 14px}.phone{max-width:280px;margin:0 auto 16px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="brand"><div class="mark">漫</div><div><b>提示词工作台</b><small>动态 Tip 原型</small></div></div>
+      <nav class="nav">
+        <button class="on" data-panel="script">剧本润色 <small>Step 1</small></button>
+        <button data-panel="characters">角色背景 <small>Step 2</small></button>
+        <button data-panel="shots">分镜拆解 <small>Step 3</small></button>
+        <button data-panel="style">风格词库 <small>Step 4</small></button>
+      </nav>
+      <div class="note">生成前用选项控制方向，生成后用自然语言做局部反馈。这个页面只演示交互。</div>
+    </aside>
+
+    <main>
+      <div class="top">
+        <div><h1 id="title">剧本润色</h1><div class="hint" id="hint">用少量选项控制改写方向，避免每次都写完整 prompt。</div></div>
+        <span class="badge" id="styleBadge">韩漫 / 赛博朋克 / 电影感</span>
+      </div>
+      <div class="stack">
+        <section class="box panel" id="panel-script">
+          <div class="head"><div><div class="title">润色参数</div><div class="sub">选项会转成稳定 prompt 变量</div></div><span class="badge">创作型任务</span></div>
+          <div class="body">
+            <div class="grid">
+              <div class="field" data-group="rhythm"><label>节奏</label><div class="chips"><button class="chip on" data-value="短剧冲突">短剧冲突</button><button class="chip" data-value="漫画分镜">漫画分镜</button><button class="chip" data-value="文学氛围">文学氛围</button><button class="chip" data-value="保守整理">保守整理</button></div></div>
+              <div class="field" data-group="rewrite"><label>改动幅度</label><div class="chips"><button class="chip" data-value="轻度">轻度</button><button class="chip on" data-value="中度">中度</button><button class="chip" data-value="大胆改写">大胆改写</button></div></div>
+              <div class="field" data-group="dialogue"><label>台词风格</label><div class="chips"><button class="chip on" data-value="自然口语">自然口语</button><button class="chip" data-value="青春感">青春感</button><button class="chip" data-value="古风">古风</button><button class="chip" data-value="克制含蓄">克制含蓄</button></div></div>
+              <div class="field" data-group="preserve"><label>剧情边界</label><div class="chips"><button class="chip on" data-value="保留原剧情">保留原剧情</button><button class="chip" data-value="允许补冲突">允许补冲突</button><button class="chip warn" data-value="允许重排">允许重排</button></div></div>
+            </div>
+            <div class="field"><label>补充要求 <span>可选</span></label><textarea id="scriptExtra">不要写得太文艺，保留短视频开场的抓人感。</textarea></div>
+            <div class="preview"><b>将发送给模型的意图摘要</b><div class="ptext" id="scriptPrompt"></div></div>
+            <div class="actions"><button class="btn primary" data-generate="script">✨ 预览润色结果</button></div>
+          </div>
+        </section>
+
+        <section class="box panel hide" id="panel-characters">
+          <div class="head"><div><div class="title">提取策略</div><div class="sub">角色和背景进入不同 schema</div></div><span class="badge">抽取型任务</span></div>
+          <div class="body">
+            <div class="grid">
+              <div class="field" data-group="scope"><label>提取范围</label><div class="chips"><button class="chip" data-value="主要角色">主要角色</button><button class="chip" data-value="主要+配角">主要+配角</button><button class="chip on" data-value="角色+背景场景">角色+背景场景</button></div></div>
+              <div class="field" data-group="detail"><label>设定细节</label><div class="chips"><button class="chip" data-value="简洁">简洁</button><button class="chip on" data-value="详细">详细</button></div></div>
+              <div class="field" data-group="invent"><label>外貌补全</label><div class="chips"><button class="chip on" data-value="只按原文">只按原文</button><button class="chip" data-value="允许合理补全">允许合理补全</button></div></div>
+              <div class="field" data-group="bgmode"><label>背景处理</label><div class="chips"><button class="chip on" data-value="生成场景图">生成场景图</button><button class="chip" data-value="仅做设定">仅做设定</button></div></div>
+            </div>
+            <div class="preview"><b>角色/背景输出预期</b><div class="ptext">角色输出 attributes + 角色参考图 prompt；背景输出 location、lighting、props、atmosphere + 场景图 prompt。</div></div>
+            <div class="actions"><button class="btn primary" data-generate="characters">✨ 预览提取结果</button></div>
+          </div>
+        </section>
+
+        <section class="box panel hide" id="panel-shots">
+          <div class="head"><div><div class="title">分镜参数</div><div class="sub">控制镜头数量、叙事节奏和空镜</div></div><span class="badge">结构化 JSON</span></div>
+          <div class="body">
+            <div class="grid">
+              <div class="field" data-group="density"><label>分镜密度</label><div class="chips"><button class="chip" data-value="关键镜头">关键镜头</button><button class="chip on" data-value="标准">标准</button><button class="chip" data-value="细分动作">细分动作</button></div></div>
+              <div class="field" data-group="camera"><label>镜头风格</label><div class="chips"><button class="chip on" data-value="漫画格子">漫画格子</button><button class="chip" data-value="电影感">电影感</button><button class="chip" data-value="短视频强冲突">短视频强冲突</button></div></div>
+              <div class="field" data-group="cutaway"><label>空镜/转场</label><div class="chips"><button class="chip" data-value="不加">不加</button><button class="chip on" data-value="适量加入">适量加入</button></div></div>
+              <div class="field" data-group="dialogueSplit"><label>台词拆分</label><div class="chips"><button class="chip" data-value="一句一格">一句一格</button><button class="chip on" data-value="动作优先">动作优先</button></div></div>
+            </div>
+            <div class="field"><label>补充要求</label><textarea id="shotExtra">多给关键表情特写，保留一个环境空镜。</textarea></div>
+            <div class="actions"><button class="btn primary" data-generate="shots">✨ 预览分镜结果</button></div>
+          </div>
+        </section>
+
+        <section class="box panel hide" id="panel-style">
+          <div class="head"><div><div class="title">组合式风格</div><div class="sub">基础画风 + 视觉题材 + 画面气质</div></div><span class="badge">风格词库</span></div>
+          <div class="body">
+            <div class="field style-group"><label>基础画风</label><div class="chips"><button class="chip on" data-value="韩漫" data-prompt="韩漫风格，精致线条，细腻上色">韩漫</button><button class="chip" data-value="日漫" data-prompt="日漫风格，清晰线稿，漫画分镜感">日漫</button><button class="chip" data-value="厚涂漫画" data-prompt="厚涂漫画风格，强体积感，丰富笔触">厚涂漫画</button><button class="chip" data-value="写实漫画" data-prompt="写实漫画风格，真实比例，电影级光影">写实漫画</button></div></div>
+            <div class="field style-group multi"><label>视觉题材 <span>可多选</span></label><div class="chips"><button class="chip" data-value="机甲科幻" data-prompt="机甲科幻世界观，金属装甲，工业细节，高科技界面">机甲科幻</button><button class="chip" data-value="末日废土" data-prompt="末日废土世界观，破败城市，沙尘天空，锈蚀金属">末日废土</button><button class="chip on" data-value="赛博朋克" data-prompt="赛博朋克都市，霓虹灯牌，雨夜街道，义体科技">赛博朋克</button><button class="chip" data-value="性感魅惑" data-prompt="成熟气质，修身时装，精致妆容，魅惑氛围，高级时尚感，非露骨表达">性感魅惑</button><button class="chip" data-value="怪谈民俗" data-prompt="怪谈民俗氛围，旧街巷，纸符，冷雾，东方悬疑感">怪谈民俗</button></div></div>
+            <div class="field style-group multi"><label>画面气质 <span>可多选</span></label><div class="chips"><button class="chip on" data-value="电影感" data-prompt="电影感构图，层次光影，画面张力强">电影感</button><button class="chip" data-value="压迫感" data-prompt="低角度压迫感，强对比阴影，紧张氛围">压迫感</button><button class="chip" data-value="冷色调" data-prompt="冷色调，蓝紫光影，克制情绪">冷色调</button><button class="chip" data-value="高级感" data-prompt="高级感，干净画面，精致材质，克制构图">高级感</button></div></div>
+            <div class="preview"><b>组合后的风格 prompt</b><div class="ptext" id="stylePrompt"></div></div>
+            <div class="actions"><button class="btn primary" data-generate="style">应用到右侧预览</button></div>
+          </div>
+        </section>
+
+        <section class="box"><div class="head"><div><div class="title">生成预览</div><div class="sub" id="resultHint">点击任一“预览”按钮查看模拟结果</div></div></div><div class="body"><div class="results" id="results"></div></div></section>
+      </div>
+    </main>
+
+    <aside class="right">
+      <div class="phone"><div class="screen" id="screen"><div class="cap" id="caption">雨夜霓虹下，角色站在旧街道入口，远处高楼闪烁，画面保持韩漫线条和电影感光影。</div></div></div>
+      <div class="chat"><h3>局部反馈 <span class="badge">结果后使用</span></h3><div class="msgs" id="msgs"><div class="msg">已生成初版。你可以说“第 2 格改成特写”或“整体更末日废土”。</div><div class="msg user">整体更赛博朋克，少一点古风。</div><div class="msg">将保留角色动作，替换环境关键词为霓虹街道、雨夜反光、义体科技。</div></div><div class="input"><div><button class="quick">第 2 格改特写</button><button class="quick">更性感但不露骨</button><button class="quick">背景更末日废土</button></div><textarea id="fb" rows="2" placeholder="描述你想局部修改的地方"></textarea><button class="btn primary" id="send">提交反馈</button></div></div>
+    </aside>
+  </div>
+
+  <script>
+    const meta={script:["剧本润色","用少量选项控制改写方向，避免每次都写完整 prompt。"],characters:["角色背景","角色和背景使用不同 schema，避免 prompt 串味。"],shots:["分镜拆解","用密度、镜头、转场选项控制 JSON 输出。"],style:["风格词库","把用户可见风格转成图像模型吃得懂的视觉词。"]};
+    const data={script:[["润色片段","短剧冲突 / 中度 / 自然口语","【场景：雨后的旧教学楼】林夏冲到美术教室门口，呼吸还没稳住。顾言站在窗边，手里正拿着那本素描本。林夏：（压低声音）你为什么拿我的东西？顾言：（把本子合上）我是在走廊捡到的。那封信，我没有看。",["保留原剧情","增强动作","台词更短"]]],characters:[["林夏","character schema","内向敏感的女高中生，珍视素描本，情绪容易紧绷。角色 prompt 将锁定发型、校服、表情倾向。",["女生","校服","紧张","黑色短发"]],["旧教学楼美术教室","background schema","雨后旧教学楼，潮湿走廊，窗边美术教室，灯光忽明忽暗。背景 prompt 不使用“正面全身”。",["雨后","旧教室","窗边","潮湿反光"]]],shots:[["#1 环境空镜","适量加入 / 漫画格子","雨后旧教学楼外，积水倒映窗户灯光，远处雷声刚停。",["空镜","远景","建立氛围"]],["#2 对峙","动作优先","林夏冲到美术教室门口，顾言站在窗边拿着素描本，两人隔着半间教室对视。",["中景","紧张","双人构图"]],["#3 手部特写","关键表情特写","林夏伸手去抢素描本，纸页边缘露出告白信一角。",["特写","道具","悬念"]]],style:[]};
+    function val(g){return document.querySelector(`[data-group="${g}"] .chip.on`)?.dataset.value||""}
+    function updateScript(){document.getElementById("scriptPrompt").textContent=[`节奏：${val("rhythm")}`,`改动幅度：${val("rewrite")}`,`台词风格：${val("dialogue")}`,`剧情边界：${val("preserve")}`,document.getElementById("scriptExtra").value.trim()?`补充要求：${document.getElementById("scriptExtra").value.trim()}`:""].filter(Boolean).join("；")}
+    function styleParts(){return [...document.querySelectorAll(".style-group .chip.on")].map(x=>({v:x.dataset.value,p:x.dataset.prompt}))}
+    function updateStyle(){const ps=styleParts();const prompt=ps.map(x=>x.p).join("，");document.getElementById("stylePrompt").textContent=prompt;document.getElementById("styleBadge").textContent=ps.map(x=>x.v).join(" / ");data.style=[["当前风格组合",ps.map(x=>x.v).join(" / "),prompt,ps.slice(0,4).map(x=>x.v)]]}
+    function render(type){const list=data[type]||[];document.getElementById("results").innerHTML=list.map(i=>`<div class="item"><div class="meta"><span class="name">${i[0]}</span><span>${i[1]}</span></div><div class="ptext">${i[2]}</div><div class="tags">${i[3].map(t=>`<span class="tag">${t}</span>`).join("")}</div></div>`).join("");document.getElementById("resultHint").textContent="模拟结果已刷新，可在右侧继续用自然语言反馈修改。"}
+    document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");document.querySelectorAll(".panel").forEach(x=>x.classList.add("hide"));document.getElementById("panel-"+b.dataset.panel).classList.remove("hide");document.getElementById("title").textContent=meta[b.dataset.panel][0];document.getElementById("hint").textContent=meta[b.dataset.panel][1]});
+    document.querySelectorAll("[data-group] .chip").forEach(c=>c.onclick=()=>{const f=c.closest("[data-group]");f.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");updateScript()});
+    document.querySelectorAll(".style-group .chip").forEach(c=>c.onclick=()=>{const f=c.closest(".style-group");if(f.classList.contains("multi")){c.classList.toggle("on");if(!f.querySelector(".chip.on"))c.classList.add("on")}else{f.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on")}updateStyle()});
+    document.querySelectorAll("[data-generate]").forEach(b=>b.onclick=()=>{updateScript();updateStyle();render(b.dataset.generate);if(b.dataset.generate==="style"){const vs=styleParts().map(x=>x.v);let art="linear-gradient(135deg,#1e1b4b,#111827 56%,#451a03)";if(vs.includes("末日废土"))art="linear-gradient(145deg,#451a03,#78350f 38%,#111827 74%)";if(vs.includes("机甲科幻"))art="linear-gradient(145deg,#0f172a,#1e3a8a 38%,#030712 78%)";if(vs.includes("性感魅惑"))art="linear-gradient(145deg,#3b0764,#831843 42%,#111827 78%)";document.getElementById("screen").style.setProperty("--art",art);document.getElementById("caption").textContent=document.getElementById("stylePrompt").textContent}});
+    document.getElementById("scriptExtra").oninput=updateScript;document.querySelectorAll(".quick").forEach(q=>q.onclick=()=>document.getElementById("fb").value=q.textContent);document.getElementById("send").onclick=()=>{const t=document.getElementById("fb").value.trim();if(!t)return;document.getElementById("msgs").insertAdjacentHTML("beforeend",`<div class="msg user">${t}</div><div class="msg">收到。将把这条反馈转成局部修改指令，只影响当前结果，不重置整段剧本。</div>`);document.getElementById("fb").value=""};
+    updateScript();updateStyle();render("script");
+  </script>
+</body>
+</html>

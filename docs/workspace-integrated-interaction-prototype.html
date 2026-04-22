@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>项目工作台融合交互原型</title>
+  <style>
+    :root{--bg:#030712;--panel:#0b1220;--card:#111827;--soft:#1f2937;--line:#283244;--line2:#374151;--text:#f9fafb;--muted:#9ca3af;--sub:#6b7280;--v:#7c3aed;--v2:#a78bfa;--v3:#c4b5fd;--yellow:#facc15;--green:#34d399;--red:#f87171;--r:8px}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 30% -10%,rgba(124,58,237,.15),transparent 34rem),var(--bg);color:var(--text);font:13px/1.5 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0}button,textarea{font:inherit}button{cursor:pointer}
+    .app{min-height:100vh;display:flex;flex-direction:column}.top{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:rgba(3,7,18,.86);position:sticky;top:0;z-index:5}.left{display:flex;align-items:center;gap:12px}.back{color:var(--sub);text-decoration:none}.name{font-weight:700}.badge{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;font-size:11px;color:var(--v3);background:rgba(76,29,149,.32);border:1px solid rgba(124,58,237,.28);white-space:nowrap}.status{color:var(--yellow);background:rgba(113,63,18,.28);border-color:rgba(250,204,21,.25)}.steps{height:62px;border-bottom:1px solid var(--line);display:flex;justify-content:center;background:#050916}.stepwrap{width:min(920px,100%);display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 18px}.step{border:1px solid var(--line2);border-radius:8px;background:#0b1220;color:var(--muted);display:flex;align-items:center;gap:10px;padding:0 12px}.step.on{border-color:rgba(167,139,250,.55);color:#ede9fe;background:rgba(76,29,149,.24)}.num{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#1f2937;font-size:11px}.step.on .num{background:var(--v);color:white}.main{width:min(1120px,100%);margin:0 auto;padding:22px 20px 86px;display:grid;gap:14px}
+    .toolbar{border:1px solid var(--line);border-radius:var(--r);background:rgba(11,18,32,.82);box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden}.flow{border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(3,7,18,.28)}.pill{border:1px solid var(--line2);border-radius:999px;padding:4px 9px;color:var(--muted);font-size:11px}.pill.on{border-color:rgba(167,139,250,.6);background:rgba(76,29,149,.32);color:var(--v3)}.arrow{color:var(--sub)}.bar{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:center;padding:14px 16px}.summary{min-width:0}.label{color:var(--sub);font-size:11px;margin-bottom:4px}.summary b{font-size:13px;color:#e5e7eb}.summary span{color:var(--muted)}.btn{min-height:34px;border:1px solid var(--line2);border-radius:7px;background:#1f2937;color:#e5e7eb;padding:0 12px}.btn:hover{filter:brightness(1.08)}.btn.primary{background:var(--v);border-color:rgba(124,58,237,.75);font-weight:700;color:white}.btn:disabled{opacity:.45;cursor:not-allowed}.drawer{border-top:1px solid var(--line);padding:16px;display:none;background:rgba(3,7,18,.32)}.drawer.open{display:block}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-size:12px;color:#d1d5db;font-weight:600;display:flex;justify-content:space-between}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{min-height:30px;border:1px solid var(--line2);border-radius:7px;background:#111827;color:#cbd5e1;padding:0 10px}.chip.on{border-color:rgba(167,139,250,.65);background:rgba(76,29,149,.4);color:var(--v3)}textarea{width:100%;min-height:72px;resize:vertical;border:1px solid var(--line2);border-radius:var(--r);background:#030712;color:#e5e7eb;padding:10px;outline:none}textarea:focus{border-color:var(--v2)}
+    .list{display:grid;gap:12px}.row{border:1px solid var(--line);border-radius:var(--r);background:rgba(17,24,39,.78);display:grid;grid-template-columns:112px minmax(0,1fr);gap:14px;padding:14px}.thumb{aspect-ratio:9/16;border-radius:8px;border:1px solid #263244;background:linear-gradient(145deg,#1e1b4b,#111827 60%,#3b0764);position:relative;overflow:hidden;display:grid;place-items:center;color:var(--muted);font-size:12px}.thumb.done:before{content:"";position:absolute;inset:0;background:linear-gradient(130deg,rgba(124,58,237,.2),transparent 55%),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 14px)}.thumb.done span{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(2,6,23,.65);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px;color:#fff}.spin{width:22px;height:22px;border:2px solid rgba(250,204,21,.28);border-top-color:var(--yellow);border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(1turn)}}.content{min-width:0}.meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.idx{font-weight:700}.small{color:var(--sub);font-size:11px}.desc{color:#e5e7eb;margin-bottom:8px}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.tag{border:1px solid var(--line2);border-radius:999px;background:#1f2937;color:#cbd5e1;font-size:11px;padding:3px 7px}.prompt{border-top:1px solid var(--line);padding-top:10px;display:none}.prompt.open{display:block}.promptbox{background:#0b1020;border:1px solid rgba(124,58,237,.25);border-radius:7px;padding:10px;color:#ddd6fe;line-height:1.7;font-size:12px}.rowactions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}.footer{position:fixed;left:0;right:0;bottom:0;border-top:1px solid var(--line);background:rgba(3,7,18,.9);backdrop-filter:blur(12px);height:58px;display:flex;align-items:center;justify-content:center}.footinner{width:min(1120px,100%);padding:0 20px;display:flex;justify-content:space-between;align-items:center}.modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal.open{display:flex}.dialog{width:min(620px,100%);border:1px solid var(--line2);border-radius:10px;background:#0b1220;box-shadow:0 30px 100px rgba(0,0,0,.5);overflow:hidden}.dialog h3{margin:0;padding:16px;border-bottom:1px solid var(--line);font-size:15px}.dialog .body{padding:16px}.preview{border:1px solid rgba(124,58,237,.28);background:rgba(49,46,129,.18);border-radius:var(--r);padding:12px;color:#ddd6fe;line-height:1.7}.hidden{display:none}
+    @media(max-width:780px){.bar{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.row{grid-template-columns:84px 1fr}.stepwrap{grid-template-columns:1fr}.steps{height:auto}.top{align-items:flex-start;height:auto;padding:14px}.rightbadges{display:none}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="left"><a class="back" href="#">←</a><span class="name">雨夜告白短剧</span><span class="badge status" id="projectStatus">分镜确认中</span></div>
+      <div class="rightbadges"><span class="badge">项目级风格：韩漫 · 赛博朋克 · 电影感</span></div>
+    </header>
+
+    <div class="steps">
+      <div class="stepwrap">
+        <div class="step"><span class="num">1</span><span>剧本 & 角色</span></div>
+        <div class="step on"><span class="num">2</span><span>分镜 & 出图</span></div>
+        <div class="step"><span class="num">3</span><span>配音 & 导出</span></div>
+      </div>
+    </div>
+
+    <main class="main">
+      <section class="toolbar">
+        <div class="flow">
+          <span class="pill">1 AI 生成分镜脚本</span><span class="arrow">→</span>
+          <span class="pill on" id="flowEdit">2 用户确认/编辑</span><span class="arrow">→</span>
+          <span class="pill" id="flowImage">3 点击开始出图</span><span class="arrow">→</span>
+          <span class="pill">4 单格反馈重生成</span>
+        </div>
+        <div class="bar">
+          <div class="summary">
+            <div class="label">分镜策略</div>
+            <b id="shotSummary">标准 · 漫画格子 · 适量空镜</b>
+            <span> 影响 shot list</span>
+          </div>
+          <div class="summary">
+            <div class="label">视觉风格</div>
+            <b id="styleSummary">韩漫 · 赛博朋克 · 电影感</b>
+            <span> 影响即梦 prompt</span>
+          </div>
+          <button class="btn" id="toggleDrawer">调整生成设置</button>
+        </div>
+        <div class="drawer" id="drawer">
+          <div class="grid">
+            <div>
+              <div class="field" data-group="density"><label>分镜密度</label><div class="chips"><button class="chip">关键镜头</button><button class="chip on">标准</button><button class="chip">细分动作</button></div></div>
+              <div class="field" data-group="camera"><label>镜头风格</label><div class="chips"><button class="chip on">漫画格子</button><button class="chip">电影感</button><button class="chip">短视频强冲突</button></div></div>
+              <div class="field" data-group="cutaway"><label>空镜/转场</label><div class="chips"><button class="chip">不加</button><button class="chip on">适量空镜</button></div></div>
+              <div class="field"><label>分镜补充要求</label><textarea id="shotExtra">多给关键表情特写，保留一个环境空镜。</textarea></div>
+            </div>
+            <div>
+              <div class="field style single"><label>基础画风</label><div class="chips"><button class="chip">日漫</button><button class="chip on">韩漫</button><button class="chip">厚涂漫画</button><button class="chip">写实漫画</button></div></div>
+              <div class="field style multi"><label>视觉题材</label><div class="chips"><button class="chip">机甲科幻</button><button class="chip">末日废土</button><button class="chip on">赛博朋克</button><button class="chip">性感魅惑</button><button class="chip">怪谈民俗</button></div></div>
+              <div class="field style multi"><label>画面气质</label><div class="chips"><button class="chip on">电影感</button><button class="chip">压迫感</button><button class="chip">冷色调</button><button class="chip">高级感</button></div></div>
+              <div class="field"><label>风格补充要求</label><textarea id="styleExtra">雨夜霓虹更强，但角色不要变成科幻装甲。</textarea></div>
+            </div>
+          </div>
+          <div class="rowactions"><button class="btn primary" id="applySettings">应用设置</button></div>
+        </div>
+      </section>
+
+      <section class="list" id="list">
+        <article class="row">
+          <div class="thumb shotThumb">待出图</div>
+          <div class="content">
+            <div class="meta"><span class="idx">#1 环境空镜</span><span class="small shotState">分镜已确认，未出图</span></div>
+            <div class="desc">雨后旧教学楼外，积水倒映窗户灯光，远处雷声刚停。</div>
+            <div class="tags"><span class="tag">空镜</span><span class="tag">远景</span><span class="tag">潮湿反光</span></div>
+            <div class="prompt"><div class="promptbox">韩漫风格，精致线条，赛博朋克都市，雨夜霓虹，旧教学楼外，积水反光，电影感构图，高清细腻</div></div>
+            <div class="rowactions"><button class="btn">编辑分镜</button><button class="btn togglePrompt">预览即梦词</button><button class="btn feedback imageOnly" disabled>加要求</button><button class="btn imageOnly" disabled>↻ 重生成</button><button class="btn primary singleGen">生成此格</button></div>
+          </div>
+        </article>
+        <article class="row">
+          <div class="thumb shotThumb">待出图</div>
+          <div class="content">
+            <div class="meta"><span class="idx">#2 对峙</span><span class="small shotState">分镜已确认，未出图</span></div>
+            <div class="desc">林夏冲到美术教室门口，顾言站在窗边拿着素描本，两人隔着半间教室对视。</div>
+            <div class="tags"><span class="tag">中景</span><span class="tag">紧张</span><span class="tag">双人构图</span></div>
+            <div class="prompt"><div class="promptbox">角色锁定词 + 雨夜美术教室 + 韩漫精致线条 + 赛博朋克霓虹反光 + 紧张情绪 + 中景</div></div>
+            <div class="rowactions"><button class="btn">编辑分镜</button><button class="btn togglePrompt">预览即梦词</button><button class="btn feedback imageOnly" disabled>加要求</button><button class="btn imageOnly" disabled>↻ 重生成</button><button class="btn primary singleGen">生成此格</button></div>
+          </div>
+        </article>
+        <article class="row">
+          <div class="thumb shotThumb">待出图</div>
+          <div class="content">
+            <div class="meta"><span class="idx">#3 手部特写</span><span class="small shotState">分镜已确认，未出图</span></div>
+            <div class="desc">林夏伸手去抢素描本，纸页边缘露出告白信一角。</div>
+            <div class="tags"><span class="tag">特写</span><span class="tag">道具</span><span class="tag">悬念</span></div>
+            <div class="prompt"><div class="promptbox">手部特写，素描本边缘露出告白信，雨夜窗光，韩漫线条，电影感，高清细腻</div></div>
+            <div class="rowactions"><button class="btn">编辑分镜</button><button class="btn togglePrompt">预览即梦词</button><button class="btn feedback imageOnly" disabled>加要求</button><button class="btn imageOnly" disabled>↻ 重生成</button><button class="btn primary singleGen">生成此格</button></div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div class="footer">
+      <div class="footinner">
+        <span class="small" id="footerStatus">3 条分镜脚本 · 0 格出图 · 可单格试生成，也可批量开始出图</span>
+        <div><button class="btn" id="regenShots">重新生成脚本</button> <button class="btn primary" id="batch">✨ 开始出图</button></div>
+      </div>
+    </div>
+
+    <div class="modal" id="modal">
+      <div class="dialog">
+        <h3>给这一格加要求</h3>
+        <div class="body">
+          <div class="field"><label>自然语言反馈</label><textarea id="panelFeedback">镜头更压迫一点，改成低角度，加入红色警示灯。</textarea></div>
+          <div class="preview" id="mergedPrompt">全局风格 + 当前分镜 + 角色锁定词 + 局部反馈：低角度压迫感，红色警示灯，高对比阴影。</div>
+          <div class="rowactions"><button class="btn" id="closeModal">取消</button><button class="btn primary">应用并重生成</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const drawer=document.getElementById('drawer');
+    document.getElementById('toggleDrawer').onclick=()=>drawer.classList.toggle('open');
+    function activeText(sel){return [...document.querySelectorAll(sel+' .chip.on')].map(x=>x.textContent.trim()).join(' · ')}
+    document.querySelectorAll('[data-group] .chip').forEach(c=>c.onclick=()=>{const p=c.closest('[data-group]');p.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on')});
+    document.querySelectorAll('.style .chip').forEach(c=>c.onclick=()=>{const p=c.closest('.style');if(p.classList.contains('multi')){c.classList.toggle('on');if(!p.querySelector('.chip.on'))c.classList.add('on')}else{p.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on')}});
+    document.getElementById('applySettings').onclick=()=>{document.getElementById('shotSummary').textContent=activeText('[data-group="density"]')+' · '+activeText('[data-group="camera"]')+' · '+activeText('[data-group="cutaway"]');document.getElementById('styleSummary').textContent=activeText('.style');drawer.classList.remove('open')};
+    document.querySelectorAll('.togglePrompt').forEach(b=>b.onclick=()=>b.closest('.content').querySelector('.prompt').classList.toggle('open'));
+    const modal=document.getElementById('modal');document.querySelectorAll('.feedback').forEach(b=>b.onclick=()=>modal.classList.add('open'));document.getElementById('closeModal').onclick=()=>modal.classList.remove('open');modal.onclick=e=>{if(e.target===modal)modal.classList.remove('open')};
+    document.getElementById('panelFeedback').oninput=e=>{document.getElementById('mergedPrompt').textContent='全局风格 + 当前分镜 + 角色锁定词 + 局部反馈：'+e.target.value};
+    document.querySelectorAll('.singleGen').forEach(btn=>btn.onclick=()=>{
+      const row=btn.closest('.row');
+      const thumb=row.querySelector('.shotThumb');
+      const state=row.querySelector('.shotState');
+      thumb.innerHTML='<div class="spin"></div>';
+      state.textContent='单格生成中...';
+      btn.textContent='生成中...';
+      btn.disabled=true;
+      document.getElementById('footerStatus').textContent='正在试生成单格 · 全局设置仍可调整，已生成图片不会自动覆盖';
+      setTimeout(()=>{
+        thumb.classList.add('done');
+        thumb.innerHTML='<span>单格预览</span>';
+        state.textContent='单格已生成';
+        row.querySelectorAll('.imageOnly').forEach(x=>x.disabled=false);
+        btn.textContent='已生成';
+      },900);
+    });
+    let imagesStarted=false;
+    document.getElementById('batch').onclick=()=>{
+      if(!imagesStarted){
+        imagesStarted=true;
+        document.getElementById('projectStatus').textContent='出图中';
+        document.getElementById('flowEdit').classList.remove('on');
+        document.getElementById('flowImage').classList.add('on');
+        document.getElementById('toggleDrawer').disabled=true;
+        document.getElementById('regenShots').disabled=true;
+        document.querySelectorAll('.shotThumb').forEach((x,i)=>{x.innerHTML=i===0?'<span>雨后旧楼</span>':'<div class="spin"></div>'; if(i===0)x.classList.add('done')});
+        document.querySelectorAll('.shotState').forEach((x,i)=>x.textContent=i===0?'已生成':'生成中...');
+        document.querySelectorAll('.imageOnly').forEach(x=>x.disabled=false);
+        document.getElementById('footerStatus').textContent='3 条分镜脚本 · 1 格完成 · 2 格生成中 · 生成中锁定分镜策略和全局风格';
+        document.getElementById('batch').textContent='继续出图';
+      }else{
+        alert('继续出图只处理待生成/失败项；已生成图片不会被全局风格自动覆盖。');
+      }
+    };
+  </script>
+</body>
+</html>
