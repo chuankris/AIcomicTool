@@ -3,6 +3,8 @@ import { buildSignedHeaders } from './sign'
 const BASE_URL = 'https://visual.volcengineapi.com'
 const SERVICE = 'cv'
 const REGION = 'cn-north-1'
+const ACTION = 'CVProcess'
+const VERSION = '2022-08-31'
 
 export interface GenerateImageParams {
   prompt: string
@@ -38,10 +40,12 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
     } : {}),
   })
 
-  const uri = '/v1/cv/t2i'
+  const uri = '/'
+  const query = `Action=${ACTION}&Version=${VERSION}`
   const headers = buildSignedHeaders({
     method: 'POST',
     uri,
+    query,
     body,
     accessKey: accessKeyId,
     secretKey: secretAccessKey,
@@ -49,7 +53,7 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
     region: REGION,
   })
 
-  const response = await fetch(`${BASE_URL}${uri}`, { method: 'POST', headers, body })
+  const response = await fetch(`${BASE_URL}?${query}`, { method: 'POST', headers, body })
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`即梦 API error ${response.status}: ${text}`)

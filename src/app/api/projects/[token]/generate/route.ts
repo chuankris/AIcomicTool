@@ -95,7 +95,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           secretAccessKey: creds.secretAccessKey,
         })
         await db.update(panels).set({ imageUrl, prompt, status: 'done' }).where(eq(panels.id, panel.id))
-      } catch {
+      } catch (err) {
+        console.error(`[generate] panel #${panel.index} failed:`, err)
         await db.update(panels).set({ status: 'failed' }).where(eq(panels.id, panel.id))
       }
     })
