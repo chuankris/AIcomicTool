@@ -22,6 +22,34 @@
       "when": 1776765263033,
       "tag": "0002_perfect_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1776932195839,
+      "tag": "0003_curved_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1776940843477,
+      "tag": "0004_flimsy_whiplash",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1776940955072,
+      "tag": "0005_flimsy_the_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1776943090801,
+      "tag": "0006_puzzling_gunslinger",
+      "breakpoints": true
     }
   ]
 }

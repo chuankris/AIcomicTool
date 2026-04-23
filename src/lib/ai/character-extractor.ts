@@ -12,6 +12,12 @@ const SYSTEM_PROMPT = `你是漫画角色设计师。将用户对角色的自然
 - outfit: 服装（如"白色校服"、"黑色西装"）
 - personality: 性格气质（如"内向"、"活泼"、"冷酷"）
 - expressionTendency: 表情倾向（如"微笑"、"严肃"、"忧郁"）
+- relationships: 与其他角色的关系数组
+- storyRole: 剧情功能（如"主角"、"冲突触发者"）
+- voiceProfile: 角色声音和台词气质，包含 tone、speed、lineStyle
+- fixedOutfit: 需要长期保持的固定服装
+- keyProps: 与角色绑定的关键道具数组
+- doNotChange: 后续出图不可变化的特征数组
 
 只返回 JSON，字段可以为空字符串，不要添加解释。`
 

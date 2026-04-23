@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { projects } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { callModel } from '@/lib/ai/model-client'
-import { buildCharacterPrompt } from '@/lib/ai/prompt-builder'
+import { buildReferencePrompt } from '@/lib/ai/prompt-builder'
 import type { ModelConfig, CharacterAttributes } from '@/types'
 
 const EXTRACT_SYSTEM = `你是漫画角色分析师。从剧本中提取所有出现的角色和重要背景场景，以 JSON 数组返回。
@@ -15,9 +15,9 @@ const EXTRACT_SYSTEM = `你是漫画角色分析师。从剧本中提取所有�
 
 只返回 JSON 数组，不要添加任何解释。`
 
-const REFINE_SYSTEM = `你是漫画角色设计师。将用户对角色的自然语言描述拆解为结构化属性，以 JSON 返回。
+const REFINE_SYSTEM = `你是漫画前期设定师。将用户对角色或背景场景的自然语言描述拆解为结构化属性，以 JSON 返回。
 
-字段说明：
+角色字段说明：
 - age: 年龄描述（如"17岁"）
 - gender: 性别（"男生"/"女生"）
 - hairColor: 发色（如"黑色"）
@@ -25,8 +25,23 @@ const REFINE_SYSTEM = `你是漫画角色设计师。将用户对角色的自然
 - outfit: 服装（如"白色校服"）
 - personality: 性格气质
 - expressionTendency: 表情倾向
+- relationships: 与其他角色的关系数组
+- storyRole: 剧情功能（如"主角"、"冲突触发者"）
+- voiceProfile: 角色声音和台词气质，包含 tone、speed、lineStyle
+- fixedOutfit: 需要长期保持的固定服装
+- keyProps: 与角色绑定的关键道具数组
+- doNotChange: 后续出图不可变化的特征数组
 
-只返回 JSON，字段可以为空字符串，不要添加解释。`
+背景字段说明：
+- locationType: 场景类型或地点
+- timeOfDay: 时间/天气
+- lighting: 光线
+- keyProps: 场景关键道具数组
+- atmosphere: 氛围
+- storyUsage: 场景用途
+- reusableShots: 可复用镜头数组
+
+只返回 JSON。无关字段可以为空字符串或空数组，不要添加解释。`
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -50,12 +65,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ to
           const attrRaw = await callModel(
             modelConfig,
             REFINE_SYSTEM,
-            `角色名：${item.name}，描述：${item.description}`,
+            `类型：${item.type === 'background' ? 'background' : 'character'}\n名称：${item.name}\n描述：${item.description}`,
           )
           const attrMatch = attrRaw.match(/\{[\s\S]*\}/)
           const attributes: CharacterAttributes = attrMatch ? JSON.parse(attrMatch[0]) : {}
-          const prompt = buildCharacterPrompt(attributes, project.style)
-          return { ...item, type: item.type === 'background' ? 'background' : 'character', attributes, prompt }
+          const type = item.type === 'background' ? 'background' : 'character'
+          const prompt = buildReferencePrompt({
+            type,
+            attributes,
+            style: project.style,
+            name: item.name,
+            description: item.description,
+          })
+          return { ...item, type, attributes, prompt }
         } catch {
           return { ...item, type: item.type === 'background' ? 'background' : 'character', attributes: {}, prompt: '' }
         }

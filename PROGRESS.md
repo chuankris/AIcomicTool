@@ -194,3 +194,20 @@ manga-platform/
 ---
 
 *最后更新：2026-04-20*
+# 2026-04-23 - JSON to DB audit
+
+- Started audit for JSON fields that should become DB schema.
+- Initial decision: promote `projects.shots` workflow state into structured tables; promote `characters.form_prompts` fixed-shape JSON into explicit columns; keep flexible `characters.attributes` JSON for now.
+- Added structured storyboard tables and character form prompt columns.
+- Backfilled local development DB: `storyboard_shots`, `shot_character_refs`, and `shot_character_names`.
+- Validation passed: `npx tsc --noEmit`, `npx vitest run`, and targeted eslint.
+- Error handled: first local DB backfill used invalid SQLite double-quoted empty string; reran with single quotes.
+- Error handled: first targeted eslint command included a non-existent path; reran with corrected route files.
+
+# 2026-04-23 - Legacy JSON column cleanup
+
+- Removed code fallback/mirroring for `projects.shots`.
+- Removed DB serializer fallback for `characters.form_prompts`.
+- Generated migration `drizzle/0006_puzzling_gunslinger.sql` to drop old columns.
+- Applied local DB cleanup; `projects` no longer has `shots`, `characters` no longer has `form_prompts`.
+- Validation passed: `npx tsc --noEmit`, `npx vitest run`, and targeted eslint.

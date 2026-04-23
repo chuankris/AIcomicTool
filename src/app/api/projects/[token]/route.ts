@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { Shot } from '@/types'
 import { db } from '@/lib/db'
-import { projects, characters, panels } from '@/lib/db/schema'
+import { projects, characters, panels, shotCharacterNames, shotCharacterRefs, storyboardShots } from '@/lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
+import { serializeCharacter } from '@/lib/db/serializers'
+import { listProjectShots, replaceProjectShots } from '@/lib/db/shots'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -13,11 +15,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const chars = await db.select().from(characters).where(eq(characters.projectId, project.id))
     const panelList = await db.select().from(panels).where(eq(panels.projectId, project.id))
       .orderBy(asc(panels.index))
+    const shotList = await listProjectShots(project)
 
     return NextResponse.json({
       ...project,
       modelConfig: undefined, // don't expose apiKey to frontend
-      characters: chars.map(c => ({ ...c, attributes: JSON.parse(c.attributes) })),
+      shots: shotList,
+      characters: chars.map(serializeCharacter),
       panels: panelList,
     })
   } catch (e) {
@@ -32,6 +36,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     await db.delete(panels).where(eq(panels.projectId, project.id))
+    await db.delete(shotCharacterNames).where(eq(shotCharacterNames.projectId, project.id))
+    await db.delete(shotCharacterRefs).where(eq(shotCharacterRefs.projectId, project.id))
+    await db.delete(storyboardShots).where(eq(storyboardShots.projectId, project.id))
     await db.delete(characters).where(eq(characters.projectId, project.id))
     await db.delete(projects).where(eq(projects.token, token))
     return NextResponse.json({ success: true })
@@ -64,7 +71,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
     if (name !== undefined) updates.name = name
     if (currentStep !== undefined) updates.currentStep = currentStep
     if (furthestStep !== undefined) updates.furthestStep = furthestStep
-    if (shots !== undefined) updates.shots = typeof shots === 'string' ? shots : JSON.stringify(shots)
+    if (shots !== undefined) {
+      const nextShots = typeof shots === 'string' ? JSON.parse(shots) as Shot[] : shots
+      await replaceProjectShots(project.id, nextShots)
+    }
     if (imageModel !== undefined) updates.imageModel = imageModel
 
     if (Object.keys(updates).length === 0) {
