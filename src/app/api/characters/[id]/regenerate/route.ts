@@ -4,6 +4,7 @@ import { characters, projects } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
+import { serializeCharacter } from '@/lib/db/serializers'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,7 +26,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       secretAccessKey,
     })
     const [updated] = await db.update(characters).set({ referenceImageUrl }).where(eq(characters.id, charId)).returning()
-    return NextResponse.json(updated)
+    return NextResponse.json(serializeCharacter(updated))
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }

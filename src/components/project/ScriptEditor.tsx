@@ -1,5 +1,7 @@
 'use client'
+
 import { useState } from 'react'
+import { Check, FileText, Save, Sparkles, X } from 'lucide-react'
 
 interface Props {
   token: string
@@ -14,9 +16,13 @@ export function ScriptEditor({ token, initialScript, onSave }: Props) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const hasPreview = Boolean(optimizedScript)
 
   async function handleOptimize() {
-    if (!script.trim()) { setError('请先输入剧本内容'); return }
+    if (!script.trim()) {
+      setError('请先输入剧本内容')
+      return
+    }
     setError(null)
     setIsOptimizing(true)
     setOptimizedScript(null)
@@ -37,10 +43,10 @@ export function ScriptEditor({ token, initialScript, onSave }: Props) {
   }
 
   function acceptOptimized() {
-    if (optimizedScript) {
-      setScript(optimizedScript)
-      setOptimizedScript(null)
-    }
+    if (!optimizedScript) return
+    setScript(optimizedScript)
+    setOptimizedScript(null)
+    setSaved(false)
   }
 
   async function handleSave() {
@@ -64,74 +70,126 @@ export function ScriptEditor({ token, initialScript, onSave }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold mb-1">故事剧本</h2>
-        <p className="text-xs text-gray-500 mb-3">
-          支持多角色对话，格式：角色名：（动作）台词。点击「AI 优化」自动补充场景描述和动作细节。
-        </p>
+    <section className="space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-cyan-300" />
+            <h2 className="text-sm font-semibold text-gray-100">故事剧本</h2>
+          </div>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-gray-500">
+            先把故事文本整理清楚。AI 优化只会生成一个候选版本，采用后才会替换编辑区内容。
+          </p>
+        </div>
+        {saved && (
+          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
+            已保存
+          </span>
+        )}
       </div>
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && (
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {error}
+        </div>
+      )}
 
-      <div className="flex gap-4 items-start">
-        <div className="flex-1">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-2">
           <textarea
             value={script}
-            onChange={e => { setScript(e.target.value); setSaved(false) }}
+            onChange={e => {
+              setScript(e.target.value)
+              setSaved(false)
+            }}
             placeholder={`小明走进教室，看到小红坐在窗边。\n小明：你今天来得真早。\n小红：（微笑）昨晚没睡好，来这里待着。\n小明：（坐下）要不要一起吃早饭？`}
-            rows={16}
-            className="w-full bg-gray-900 border border-gray-800 rounded-lg p-4 text-sm text-gray-200 resize-none focus:outline-none focus:border-purple-500 leading-relaxed"
+            rows={18}
+            className="min-h-[420px] w-full resize-none rounded-lg border border-gray-800 bg-gray-900/80 p-4 text-sm leading-relaxed text-gray-200 outline-none transition-colors placeholder:text-gray-700 focus:border-cyan-500/70"
           />
-          <div className="flex items-center justify-between mt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-gray-600">{script.length} 字</span>
             <div className="flex gap-2">
-              <button onClick={handleOptimize} disabled={isOptimizing || !script.trim()}
-                className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 rounded-lg text-white disabled:opacity-40 flex items-center gap-1.5">
+              <button
+                onClick={handleOptimize}
+                disabled={isOptimizing || !script.trim()}
+                className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200 transition-colors hover:border-cyan-400/60 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
                 {isOptimizing ? (
-                  <><div className="w-3 h-3 border border-purple-300 border-t-transparent rounded-full animate-spin" />优化中...</>
-                ) : '✨ AI 优化'}
+                  <span className="h-3 w-3 rounded-full border border-cyan-300 border-t-transparent animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isOptimizing ? '优化中' : 'AI 优化'}
               </button>
-              <button onClick={handleSave} disabled={isSaving}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 rounded-lg text-white disabled:opacity-40">
-                {isSaving ? '保存中...' : saved ? '✓ 已保存' : '保存'}
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <span className="h-3 w-3 rounded-full border border-gray-700 border-t-transparent animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {isSaving ? '保存中' : '保存剧本'}
               </button>
             </div>
           </div>
         </div>
 
-        {(isOptimizing || optimizedScript) && (
-          <div className="w-72 flex-shrink-0">
-            <div className="bg-gray-900 border border-purple-900/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                {isOptimizing ? (
-                  <><div className="w-3 h-3 border border-purple-300 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs text-gray-400">AI 优化中...</span></>
-                ) : (
-                  <span className="text-xs font-medium text-purple-300">✨ 优化版本</span>
-                )}
-              </div>
-              {optimizedScript && (
-                <>
-                  <div className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto bg-indigo-950 border border-purple-900/30 rounded p-2 mb-3">
-                    {optimizedScript}
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setOptimizedScript(null)}
-                      className="flex-1 py-1.5 text-xs border border-gray-700 rounded-lg text-gray-400 hover:text-gray-200">
-                      忽略
-                    </button>
-                    <button onClick={acceptOptimized}
-                      className="flex-1 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 rounded-lg text-white">
-                      ✓ 采用
-                    </button>
-                  </div>
-                </>
-              )}
+        <aside className="rounded-lg border border-gray-800 bg-gray-900/60 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-medium text-gray-200">优化预览</h3>
+              <p className="mt-1 text-xs text-gray-600">确认后再采用，不会自动覆盖原文。</p>
             </div>
+            {hasPreview && (
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">
+                待确认
+              </span>
+            )}
           </div>
-        )}
+
+          {isOptimizing && (
+            <div className="flex min-h-[260px] items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950/50">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="h-3.5 w-3.5 rounded-full border border-cyan-300 border-t-transparent animate-spin" />
+                AI 正在整理节奏、动作和场景细节
+              </div>
+            </div>
+          )}
+
+          {!isOptimizing && !optimizedScript && (
+            <div className="flex min-h-[260px] items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950/40 px-6 text-center text-xs leading-relaxed text-gray-600">
+              点击 AI 优化后，这里会显示候选剧本。你可以对比阅读，再决定是否采用。
+            </div>
+          )}
+
+          {optimizedScript && (
+            <div className="space-y-3">
+              <div className="max-h-[360px] overflow-y-auto rounded-md border border-cyan-500/20 bg-cyan-950/20 p-3 text-xs leading-relaxed text-cyan-50/90 whitespace-pre-wrap">
+                {optimizedScript}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setOptimizedScript(null)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-700 px-3 py-2 text-xs text-gray-400 transition-colors hover:border-gray-500 hover:text-gray-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  忽略
+                </button>
+                <button
+                  onClick={acceptOptimized}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-cyan-400 px-3 py-2 text-xs font-medium text-gray-950 transition-colors hover:bg-cyan-300"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  采用到编辑区
+                </button>
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
-    </div>
+    </section>
   )
 }

@@ -1,5 +1,19 @@
 'use client'
+
 import { useState } from 'react'
+import {
+  AlertCircle,
+  Check,
+  Image as ImageIcon,
+  Map,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  UserRound,
+  Wand2,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,6 +43,27 @@ interface Props {
   onCharactersChange: (chars: Character[]) => void
 }
 
+function valueToText(value: unknown): string {
+  if (!value) return ''
+  if (Array.isArray(value)) return value.filter(Boolean).join('、')
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).filter(Boolean).join('、')
+  }
+  return String(value)
+}
+
+function attributeEntries(attrs: CharacterAttributes) {
+  return Object.entries(attrs)
+    .map(([key, value]) => [key, valueToText(value)] as const)
+    .filter(([, value]) => value)
+}
+
+function typeMeta(type: CharType) {
+  return type === 'background'
+    ? { label: '背景场景', icon: Map, accent: 'teal' }
+    : { label: '角色', icon: UserRound, accent: 'violet' }
+}
+
 export function CharacterManager({ token, script, characters, onCharactersChange }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -45,9 +80,15 @@ export function CharacterManager({ token, script, characters, onCharactersChange
   const [approvingIdx, setApprovingIdx] = useState<number | null>(null)
   const [regenId, setRegenId] = useState<number | null>(null)
 
+  const approvedCharacters = characters.filter(char => char.type !== 'background')
+  const approvedBackgrounds = characters.filter(char => char.type === 'background')
+  const characterProposals = proposals.filter(p => p.type !== 'background')
+  const backgroundProposals = proposals.filter(p => p.type === 'background')
+
   async function handleExtract() {
     setExtracting(true)
     setProposals([])
+    setError(null)
     try {
       const res = await fetch(`/api/projects/${token}/extract-characters`, { method: 'POST' })
       if (!res.ok) throw new Error('提取失败')
@@ -63,18 +104,26 @@ export function CharacterManager({ token, script, characters, onCharactersChange
   async function approveProposal(idx: number) {
     const p = proposals[idx]
     setApprovingIdx(idx)
+    setError(null)
     try {
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectToken: token, name: p.name, description: p.description, attributes: p.attributes, type: p.type }),
+        body: JSON.stringify({
+          projectToken: token,
+          name: p.name,
+          description: p.description,
+          attributes: p.attributes,
+          prompt: p.prompt,
+          type: p.type,
+        }),
       })
       if (!res.ok) throw new Error('保存失败')
       const newChar = await res.json()
       onCharactersChange([...characters, { ...newChar, attributes: p.attributes }])
       setProposals(prev => prev.filter((_, i) => i !== idx))
     } catch (e) {
-      setError(e instanceof Error ? e.message : '生成图片失败')
+      setError(e instanceof Error ? e.message : '生成参考图失败')
     } finally {
       setApprovingIdx(null)
     }
@@ -86,19 +135,26 @@ export function CharacterManager({ token, script, characters, onCharactersChange
 
   async function handleRegenChar(id: number) {
     setRegenId(id)
+    setError(null)
     try {
       const res = await fetch(`/api/characters/${id}/regenerate`, { method: 'POST' })
-      if (!res.ok) throw new Error('重生成失败')
+      if (!res.ok) throw new Error('重新生成失败')
       const updated = await res.json()
-      onCharactersChange(characters.map(c => c.id === id ? { ...c, referenceImageUrl: updated.referenceImageUrl } : c))
-    } catch {
+      onCharactersChange(characters.map(c => (
+        c.id === id ? { ...c, referenceImageUrl: updated.referenceImageUrl } : c
+      )))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '重新生成失败')
     } finally {
       setRegenId(null)
     }
   }
 
   async function handleRefine(withFeedback = false) {
-    if (!name.trim() || !description.trim()) { setError('请填写名称和描述'); return }
+    if (!name.trim() || !description.trim()) {
+      setError('请填写名称和描述')
+      return
+    }
     setError(null)
     setRefineState('refining')
     try {
@@ -132,7 +188,14 @@ export function CharacterManager({ token, script, characters, onCharactersChange
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectToken: token, name, description, attributes: refineResult.attributes, prompt: refineResult.prompt, type: charType }),
+        body: JSON.stringify({
+          projectToken: token,
+          name,
+          description,
+          attributes: refineResult.attributes,
+          prompt: refineResult.prompt,
+          type: charType,
+        }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -140,8 +203,7 @@ export function CharacterManager({ token, script, characters, onCharactersChange
       }
       const newChar = await res.json()
       onCharactersChange([...characters, { ...newChar, attributes: refineResult.attributes }])
-      setName(''); setDescription(''); setRefineResult(null); setRefineState('idle')
-      setShowManualAdd(false)
+      resetForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : '生成预览图失败，请重试')
       setRefineState('reviewing')
@@ -149,8 +211,13 @@ export function CharacterManager({ token, script, characters, onCharactersChange
   }
 
   function resetForm() {
-    setName(''); setDescription(''); setRefineResult(null)
-    setRefineState('idle'); setShowFeedback(false); setFeedback(''); setError(null)
+    setName('')
+    setDescription('')
+    setRefineResult(null)
+    setRefineState('idle')
+    setShowFeedback(false)
+    setFeedback('')
+    setError(null)
     setShowManualAdd(false)
   }
 
@@ -159,225 +226,430 @@ export function CharacterManager({ token, script, characters, onCharactersChange
     onCharactersChange(characters.filter(c => c.id !== id))
   }
 
-  return (
-    <div className="space-y-4">
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-
-      {/* Approved characters */}
-      {characters.length > 0 && (
-        <div className="space-y-2">
-          {characters.map(char => (
-            <div key={char.id} className="flex gap-3 bg-gray-900 border border-gray-800 rounded-lg p-3">
-              {char.referenceImageUrl ? (
-                <div className="relative w-16 h-20 flex-shrink-0 group/img">
-                  <Lightbox src={char.referenceImageUrl} alt={char.name} className="w-full h-full object-cover rounded" />
-                  <button
-                    onClick={e => { e.stopPropagation(); handleRegenChar(char.id) }}
-                    disabled={regenId === char.id}
-                    className="absolute bottom-0.5 right-0.5 w-5 h-5 bg-black/70 hover:bg-black rounded flex items-center justify-center text-white text-xs opacity-0 group-hover/img:opacity-100 transition-opacity disabled:opacity-100"
-                    title="重新生成"
-                  >
-                    {regenId === char.id ? <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
-                  </button>
-                </div>
-              ) : (
-                <div className="w-16 h-20 bg-gray-800 rounded flex-shrink-0 flex items-center justify-center text-gray-600 text-xs">无图</div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">{char.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-300">
-                    {char.type === 'background' ? '背景' : '角色'}
-                  </span>
-                  <span className="text-xs text-green-400">✓ 已通过</span>
-                </div>
-                <div className="text-xs text-gray-400 mb-1">{char.description}</div>
-                <div className="text-xs text-purple-300 bg-indigo-950 border border-purple-900/40 rounded p-1.5 leading-relaxed">{char.prompt}</div>
-              </div>
-              <button onClick={() => removeChar(char.id)} className="text-gray-600 hover:text-red-400 text-xs self-start">✕</button>
-            </div>
-          ))}
+  function renderReferenceImage(char: Character) {
+    if (char.referenceImageUrl) {
+      return (
+        <div className="relative h-24 w-20 shrink-0 group/img">
+          <Lightbox src={char.referenceImageUrl} alt={char.name} className="h-full w-full rounded-md object-cover" />
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              handleRegenChar(char.id)
+            }}
+            disabled={regenId === char.id}
+            className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-black/75 text-white opacity-0 transition-opacity hover:bg-black group-hover/img:opacity-100 disabled:opacity-100"
+            title="重新生成参考图"
+          >
+            {regenId === char.id ? (
+              <span className="h-3 w-3 rounded-full border border-white border-t-transparent animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
-      )}
+      )
+    }
 
-      {/* AI extracted proposals */}
-      {proposals.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-gray-500">AI 提取到 {proposals.length} 个角色，逐一确认后生成参考图：</p>
-          {proposals.map((p, i) => (
-            <div key={i} className="bg-gray-900 border border-amber-700/40 rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">{p.name}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-300">
-                  {p.type === 'background' ? '背景' : '角色'}
+    return (
+      <div className="flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-700 bg-gray-900 text-gray-600">
+        <ImageIcon className="h-4 w-4" />
+        <span className="text-xs">无图</span>
+      </div>
+    )
+  }
+
+  function renderAssetCard(char: Character) {
+    const isBackground = char.type === 'background'
+    const meta = typeMeta(char.type)
+    const Icon = meta.icon
+
+    return (
+      <article key={char.id} className="flex gap-3 rounded-lg border border-gray-800 bg-gray-900/70 p-3">
+        {renderReferenceImage(char)}
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="font-medium text-sm text-gray-100">{char.name}</span>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+              isBackground ? 'bg-teal-500/10 text-teal-300' : 'bg-violet-500/10 text-violet-300'
+            }`}>
+              <Icon className="h-3 w-3" />
+              {meta.label}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+              <Check className="h-3 w-3" />
+              已确认
+            </span>
+          </div>
+          <p className="mb-2 text-xs leading-relaxed text-gray-400">{char.description}</p>
+          {attributeEntries(char.attributes).length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {attributeEntries(char.attributes).slice(0, 8).map(([key, value]) => (
+                <span key={key} className="rounded-full border border-gray-700 bg-gray-950/60 px-2 py-0.5 text-xs text-gray-300">
+                  {value}
                 </span>
-                <span className="text-xs text-amber-400">待确认</span>
-              </div>
-              <div className="text-xs text-gray-400">{p.description}</div>
-              {Object.values(p.attributes).some(Boolean) && (
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(p.attributes).map(([k, v]) => v ? (
-                    <span key={k} className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300">{v}</span>
-                  ) : null)}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => dismissProposal(i)}
-                  className="flex-1 py-1.5 text-xs border border-gray-700 rounded-lg text-gray-400 hover:border-gray-500 hover:text-gray-200 transition-colors"
-                >
-                  删除
-                </button>
-                <button
-                  onClick={() => approveProposal(i)}
-                  disabled={approvingIdx === i}
-                  className="flex-1 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg text-white transition-colors"
-                >
-                  {approvingIdx === i ? '生成中...' : '✓ 通过，生成参考图'}
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
+          <div className={`rounded-md border p-2 text-xs leading-relaxed ${
+            isBackground
+              ? 'border-teal-500/20 bg-teal-950/20 text-teal-100/80'
+              : 'border-violet-500/20 bg-violet-950/20 text-violet-100/80'
+          }`}>
+            <div className="mb-1 text-[11px] uppercase tracking-wide text-gray-500">
+              {isBackground ? '背景 Prompt' : '角色 Prompt'}
+            </div>
+            <div className="line-clamp-3">{char.prompt}</div>
+          </div>
         </div>
-      )}
-
-      {/* Extract button */}
-      {script?.trim() && proposals.length === 0 && !extracting && (
         <button
-          onClick={handleExtract}
-          className="w-full py-2 text-sm border border-dashed border-purple-700/60 text-purple-400 hover:border-purple-500 hover:text-purple-300 rounded-lg transition-colors"
+          onClick={() => removeChar(char.id)}
+          className="self-start rounded p-1 text-gray-600 transition-colors hover:bg-red-500/10 hover:text-red-300"
+          title="删除"
         >
-          ✨ AI 从剧本提取角色
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
-      )}
+      </article>
+    )
+  }
 
-      {extracting && (
-        <div className="flex items-center gap-3 py-3">
-          <div className="w-4 h-4 border-2 border-purple-700 border-t-purple-300 rounded-full animate-spin" />
-          <span className="text-sm text-gray-400">AI 正在分析剧本并提取角色...</span>
+  function renderProposalCard(p: Proposal, localIdx: number) {
+    const globalIdx = proposals.indexOf(p)
+    const isBackground = p.type === 'background'
+    const meta = typeMeta(p.type)
+    const Icon = meta.icon
+
+    return (
+      <article key={`${p.type}-${p.name}-${localIdx}`} className={`rounded-lg border p-3 ${
+        isBackground ? 'border-teal-500/30 bg-teal-950/10' : 'border-amber-500/30 bg-amber-950/10'
+      }`}>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="font-medium text-sm text-gray-100">{p.name}</span>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+            isBackground ? 'bg-teal-500/10 text-teal-300' : 'bg-violet-500/10 text-violet-300'
+          }`}>
+            <Icon className="h-3 w-3" />
+            {meta.label}
+          </span>
+          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">待确认</span>
+        </div>
+        <p className="mb-2 text-xs leading-relaxed text-gray-400">{p.description}</p>
+        {attributeEntries(p.attributes).length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {attributeEntries(p.attributes).slice(0, 10).map(([key, value]) => (
+              <span key={key} className="rounded-full border border-gray-700 bg-gray-950/50 px-2 py-0.5 text-xs text-gray-300">
+                {value}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mb-3 rounded-md border border-gray-800 bg-gray-950/50 p-2 text-xs leading-relaxed text-gray-400">
+          <span className="text-gray-500">{isBackground ? '场景参考图 Prompt：' : '角色参考图 Prompt：'}</span>
+          <span className="line-clamp-2">{p.prompt}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => dismissProposal(globalIdx)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-700 py-2 text-xs text-gray-400 transition-colors hover:border-gray-500 hover:text-gray-200"
+          >
+            <X className="h-3.5 w-3.5" />
+            忽略
+          </button>
+          <button
+            onClick={() => approveProposal(globalIdx)}
+            disabled={approvingIdx === globalIdx}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-gray-100 py-2 text-xs font-medium text-gray-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {approvingIdx === globalIdx ? (
+              <span className="h-3.5 w-3.5 rounded-full border border-gray-700 border-t-transparent animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
+            {approvingIdx === globalIdx ? '生成中' : '确认并生成参考图'}
+          </button>
+        </div>
+      </article>
+    )
+  }
+
+  return (
+    <section className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {error}
         </div>
       )}
 
-      {/* Manual add */}
+      <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-300" />
+              <h3 className="text-sm font-medium text-gray-100">AI 提取建议</h3>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">
+              从剧本中识别角色和背景场景。它们会先进入建议区，确认后才会生成参考图并加入正式设定。
+            </p>
+          </div>
+          {script?.trim() && (
+            <button
+              onClick={handleExtract}
+              disabled={extracting}
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200 transition-colors hover:border-amber-400/60 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {extracting ? (
+                <span className="h-3.5 w-3.5 rounded-full border border-amber-300 border-t-transparent animate-spin" />
+              ) : (
+                <Wand2 className="h-3.5 w-3.5" />
+              )}
+              {extracting ? '分析中' : '从剧本提取'}
+            </button>
+          )}
+        </div>
+
+        {extracting && (
+          <div className="rounded-md border border-dashed border-gray-800 bg-gray-950/50 px-4 py-5 text-center text-xs text-gray-400">
+            AI 正在分析人物、关系、固定服装、关键道具和可复用背景场景。
+          </div>
+        )}
+
+        {!extracting && proposals.length === 0 && (
+          <div className="rounded-md border border-dashed border-gray-800 bg-gray-950/40 px-4 py-5 text-center text-xs leading-relaxed text-gray-600">
+            暂无待确认建议。保存剧本后可以从剧本自动提取，也可以手动添加角色或背景。
+          </div>
+        )}
+
+        {proposals.length > 0 && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-medium text-violet-200">角色建议</h4>
+                <span className="text-xs text-gray-600">{characterProposals.length} 个</span>
+              </div>
+              {characterProposals.length > 0 ? (
+                characterProposals.map(renderProposalCard)
+              ) : (
+                <div className="rounded-md border border-dashed border-gray-800 p-4 text-center text-xs text-gray-600">暂无角色建议</div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-medium text-teal-200">背景场景建议</h4>
+                <span className="text-xs text-gray-600">{backgroundProposals.length} 个</span>
+              </div>
+              {backgroundProposals.length > 0 ? (
+                backgroundProposals.map(renderProposalCard)
+              ) : (
+                <div className="rounded-md border border-dashed border-gray-800 p-4 text-center text-xs text-gray-600">暂无背景建议</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-gray-100">
+              <UserRound className="h-4 w-4 text-violet-300" />
+              已确认角色
+            </h3>
+            <span className="text-xs text-gray-600">{approvedCharacters.length} 个</span>
+          </div>
+          {approvedCharacters.length > 0 ? (
+            approvedCharacters.map(renderAssetCard)
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-800 bg-gray-900/30 p-5 text-center text-xs text-gray-600">
+              还没有确认角色。
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-gray-100">
+              <Map className="h-4 w-4 text-teal-300" />
+              已确认背景场景
+            </h3>
+            <span className="text-xs text-gray-600">{approvedBackgrounds.length} 个</span>
+          </div>
+          {approvedBackgrounds.length > 0 ? (
+            approvedBackgrounds.map(renderAssetCard)
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-800 bg-gray-900/30 p-5 text-center text-xs text-gray-600">
+              还没有确认背景场景。
+            </div>
+          )}
+        </div>
+      </div>
+
       {!showManualAdd && refineState === 'idle' && (
         <button
           onClick={() => setShowManualAdd(true)}
-          className="w-full py-2 text-xs text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-600 rounded-lg transition-colors"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-800 py-2 text-xs text-gray-500 transition-colors hover:border-gray-600 hover:text-gray-300"
         >
-          + 手动添加角色
+          <Plus className="h-3.5 w-3.5" />
+          手动添加角色或背景场景
         </button>
       )}
 
       {(showManualAdd || refineState !== 'idle') && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <div className="text-sm font-medium mb-3">
-            {refineState === 'idle' ? '手动添加角色 / 背景场景' :
-             refineState === 'refining' ? 'AI 润色中...' :
-             refineState === 'reviewing' ? '审核润色结果' : '生成预览图中...'}
+        <div className="rounded-lg border border-gray-800 bg-gray-900/70 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-gray-100">
+                {refineState === 'idle' ? '手动添加设定' :
+                  refineState === 'refining' ? 'AI 润色中' :
+                    refineState === 'reviewing' ? '审核润色结果' : '生成参考图中'}
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">手动输入也会先经过确认，再正式加入设定。</p>
+            </div>
           </div>
 
           {refineState === 'idle' && (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <button onClick={() => setCharType('character')}
-                  className={`px-3 py-1 rounded text-xs border transition-colors ${charType === 'character' ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-700 text-gray-400'}`}>
+              <div className="inline-grid grid-cols-2 rounded-md border border-gray-800 bg-gray-950/50 p-1">
+                <button
+                  onClick={() => setCharType('character')}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs transition-colors ${
+                    charType === 'character' ? 'bg-violet-500/20 text-violet-100' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <UserRound className="h-3.5 w-3.5" />
                   角色
                 </button>
-                <button onClick={() => setCharType('background')}
-                  className={`px-3 py-1 rounded text-xs border transition-colors ${charType === 'background' ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-700 text-gray-400'}`}>
+                <button
+                  onClick={() => setCharType('background')}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs transition-colors ${
+                    charType === 'background' ? 'bg-teal-500/20 text-teal-100' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <Map className="h-3.5 w-3.5" />
                   背景场景
                 </button>
               </div>
               <div>
                 <Label>名称</Label>
-                <Input value={name} onChange={e => setName(e.target.value)}
-                  placeholder={charType === 'character' ? '如：小明' : '如：教室'}
-                  className="bg-gray-800 border-gray-700 mt-1" />
+                <Input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder={charType === 'character' ? '如：林夏' : '如：废弃地铁站'}
+                  className="mt-1 border-gray-700 bg-gray-800"
+                />
               </div>
               <div>
                 <Label>描述</Label>
-                <textarea value={description} onChange={e => setDescription(e.target.value)}
-                  placeholder={charType === 'character' ? '如：17岁内向的黑发男高中生，穿着深色校服' : '如：明亮的高中教室，午后阳光透过窗户斜射入内'}
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder={charType === 'character'
+                    ? '如：17 岁，沉默但敏锐，黑色短发，固定穿深色校服，随身带旧耳机'
+                    : '如：末日后的地下站台，冷色应急灯闪烁，墙面有旧海报和积水反光'}
                   rows={3}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 resize-none focus:outline-none focus:border-purple-500 mt-1" />
+                  className="mt-1 w-full resize-none rounded-lg border border-gray-700 bg-gray-800 p-2 text-sm text-gray-200 outline-none transition-colors focus:border-cyan-500/70"
+                />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={resetForm} variant="outline" className="flex-1 border-gray-700">取消</Button>
-                <Button onClick={() => handleRefine(false)} disabled={!name.trim() || !description.trim()}
-                  className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600">
-                  ✨ AI 润色
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={resetForm} variant="outline" className="border-gray-700">
+                  取消
+                </Button>
+                <Button
+                  onClick={() => handleRefine(false)}
+                  disabled={!name.trim() || !description.trim()}
+                  className="bg-cyan-500 text-gray-950 hover:bg-cyan-400"
+                >
+                  AI 润色
                 </Button>
               </div>
             </div>
           )}
 
           {refineState === 'refining' && (
-            <div className="flex items-center gap-3 py-4">
-              <div className="w-4 h-4 border-2 border-purple-700 border-t-purple-300 rounded-full animate-spin" />
-              <span className="text-sm text-gray-400">AI 正在生成关键词...</span>
+            <div className="flex items-center gap-3 rounded-md border border-dashed border-gray-800 bg-gray-950/50 px-4 py-5">
+              <span className="h-4 w-4 rounded-full border-2 border-cyan-700 border-t-cyan-300 animate-spin" />
+              <span className="text-sm text-gray-400">AI 正在整理关键设定和参考图 prompt。</span>
             </div>
           )}
 
           {refineState === 'reviewing' && refineResult && (
             <div className="space-y-3">
               <div>
-                <div className="text-xs text-gray-500 mb-1.5">识别到的属性</div>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(refineResult.attributes).map(([k, v]) => v ? (
-                    <span key={k} className="text-xs px-2 py-0.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300">{v}</span>
-                  ) : null)}
+                <div className="mb-1.5 text-xs text-gray-500">识别到的设定</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {attributeEntries(refineResult.attributes).map(([key, value]) => (
+                    <span key={key} className="rounded-full border border-gray-700 bg-gray-950/60 px-2 py-0.5 text-xs text-gray-300">
+                      {value}
+                    </span>
+                  ))}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1.5">即梦 Prompt</div>
-                <div className="bg-indigo-950 border border-purple-900/40 rounded-lg p-3 text-xs text-purple-200 leading-relaxed">{refineResult.prompt}</div>
+                <div className="mb-1.5 text-xs text-gray-500">参考图 Prompt</div>
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/20 p-3 text-xs leading-relaxed text-cyan-50/85">
+                  {refineResult.prompt}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowFeedback(true)}
-                  className="flex-1 py-2 text-xs border border-gray-700 rounded-lg text-gray-400 hover:border-gray-500 hover:text-gray-200 transition-colors">
-                  ✕ 哪里不对
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowFeedback(true)}
+                  className="rounded-md border border-gray-700 py-2 text-xs text-gray-400 transition-colors hover:border-gray-500 hover:text-gray-200"
+                >
+                  哪里不对
                 </button>
-                <button onClick={handleApprove}
-                  className="flex-1 py-2 text-xs bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors">
-                  ✓ 通过，生成预览图
+                <button
+                  onClick={handleApprove}
+                  className="rounded-md bg-gray-100 py-2 text-xs font-medium text-gray-950 transition-colors hover:bg-white"
+                >
+                  确认并生成参考图
                 </button>
               </div>
               {showFeedback && (
-                <div className="border-t border-gray-800 pt-3 space-y-2">
+                <div className="space-y-2 border-t border-gray-800 pt-3">
                   <Label>哪里需要调整？</Label>
-                  <textarea value={feedback} onChange={e => setFeedback(e.target.value)}
-                    placeholder="如：头发应该是黑色，不是棕色"
+                  <textarea
+                    value={feedback}
+                    onChange={e => setFeedback(e.target.value)}
+                    placeholder="如：头发应该是黑色，服装要固定为白衬衫和深色外套"
                     rows={2}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-xs text-gray-200 resize-none focus:outline-none focus:border-purple-500" />
-                  <div className="flex gap-2">
-                    <button onClick={() => { setShowFeedback(false); setFeedback('') }}
-                      className="flex-1 py-1.5 text-xs border border-gray-700 rounded-lg text-gray-400 hover:text-gray-200">取消</button>
-                    <button onClick={() => handleRefine(true)} disabled={!feedback.trim()}
-                      className="flex-1 py-1.5 text-xs bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 rounded-lg text-white disabled:opacity-40">
-                      ✨ 重新润色
+                    className="w-full resize-none rounded-lg border border-gray-700 bg-gray-800 p-2 text-xs text-gray-200 outline-none transition-colors focus:border-cyan-500/70"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        setShowFeedback(false)
+                        setFeedback('')
+                      }}
+                      className="rounded-md border border-gray-700 py-1.5 text-xs text-gray-400 hover:text-gray-200"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={() => handleRefine(true)}
+                      disabled={!feedback.trim()}
+                      className="rounded-md bg-cyan-500 py-1.5 text-xs font-medium text-gray-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      重新润色
                     </button>
                   </div>
                 </div>
               )}
-              <button onClick={resetForm} className="w-full text-xs text-gray-600 hover:text-gray-400 pt-1">取消，重新输入</button>
+              <button onClick={resetForm} className="w-full pt-1 text-xs text-gray-600 hover:text-gray-400">
+                取消，重新输入
+              </button>
             </div>
           )}
 
           {refineState === 'generating' && (
-            <div className="flex items-center gap-3 py-4">
-              <div className="w-4 h-4 border-2 border-purple-700 border-t-purple-300 rounded-full animate-spin" />
+            <div className="flex items-center gap-3 rounded-md border border-dashed border-gray-800 bg-gray-950/50 px-4 py-5">
+              <span className="h-4 w-4 rounded-full border-2 border-cyan-700 border-t-cyan-300 animate-spin" />
               <div>
-                <div className="text-sm text-gray-300">正在生成角色预览图...</div>
-                <div className="text-xs text-gray-500 mt-0.5">调用即梦 API，约需 10-20 秒</div>
+                <div className="text-sm text-gray-300">正在生成参考图</div>
+                <div className="mt-0.5 text-xs text-gray-500">角色会生成角色参考图，背景会生成场景参考图。</div>
               </div>
             </div>
           )}
         </div>
       )}
-
-      {refineState === 'idle' && characters.length === 0 && proposals.length === 0 && !showManualAdd && (
-        <p className="text-xs text-gray-600 text-center">角色设定可选，添加后 AI 将保持角色形象一致</p>
-      )}
-    </div>
+    </section>
   )
 }

@@ -3,12 +3,12 @@ import { db } from '@/lib/db'
 import { projects } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { callModel } from '@/lib/ai/model-client'
-import { buildCharacterPrompt } from '@/lib/ai/prompt-builder'
+import { buildReferencePrompt } from '@/lib/ai/prompt-builder'
 import type { ModelConfig, CharacterAttributes } from '@/types'
 
-const REFINE_SYSTEM_PROMPT = `你是漫画角色设计师。将用户对角色的自然语言描述拆解为结构化属性，以 JSON 返回。
+const REFINE_SYSTEM_PROMPT = `你是漫画前期设定师。将用户对角色或背景场景的自然语言描述拆解为结构化属性，以 JSON 返回。
 
-字段说明：
+角色字段说明：
 - age: 年龄描述（如"17岁"）
 - gender: 性别（"男生"/"女生"）
 - hairColor: 发色（如"黑色"、"棕色"、"金色"）
@@ -16,8 +16,23 @@ const REFINE_SYSTEM_PROMPT = `你是漫画角色设计师。将用户对角色�
 - outfit: 服装（如"白色校服"、"黑色西装"）
 - personality: 性格气质（如"内向"、"活泼"、"冷酷"）
 - expressionTendency: 表情倾向（如"微笑"、"严肃"、"忧郁"）
+- relationships: 与其他角色的关系数组（如["误会对象","暗恋"]）
+- storyRole: 剧情功能（如"主角"、"冲突触发者"、"秘密持有者"）
+- voiceProfile: 角色声音和台词气质，包含 tone、speed、lineStyle
+- fixedOutfit: 需要长期保持的固定服装
+- keyProps: 与角色绑定的关键道具数组
+- doNotChange: 后续出图不可变化的特征数组
 
-只返回 JSON，字段可以为空字符串，不要添加解释。`
+背景字段说明：
+- locationType: 场景类型或地点（如"旧教学楼美术教室"）
+- timeOfDay: 时间/天气（如"雨夜"、"午后"）
+- lighting: 光线（如"霓虹反光"、"烛光"）
+- keyProps: 场景关键道具数组（如["画架","素描本"]）
+- atmosphere: 氛围（如"悬疑暧昧"）
+- storyUsage: 场景用途（如"对峙场景"、"转场空镜"）
+- reusableShots: 可复用镜头数组（如["窗边","门口"]）
+
+只返回 JSON。无关字段可以为空字符串或空数组，不要添加解释。`
 
 const REFINE_WITH_FEEDBACK_PROMPT = `你是漫画角色设计师。根据用户反馈调整角色属性，以 JSON 返回更新后的属性。
 原则：只调整用户指出的问题，其他属性保持不变。只返回 JSON，不要添加解释。`
@@ -54,12 +69,18 @@ export async function POST(req: NextRequest) {
       const match = raw.match(/\{[\s\S]*\}/)
       attributes = match ? (JSON.parse(match[0]) as CharacterAttributes) : currentAttributes
     } else {
-      const raw = await callModel(modelConfig, REFINE_SYSTEM_PROMPT, `角色名：${name}，描述：${description}`)
+      const raw = await callModel(modelConfig, REFINE_SYSTEM_PROMPT, `类型：${type === 'background' ? 'background' : 'character'}\n名称：${name}\n描述：${description}`)
       const match = raw.match(/\{[\s\S]*\}/)
       attributes = match ? (JSON.parse(match[0]) as CharacterAttributes) : {}
     }
 
-    const prompt = buildCharacterPrompt(attributes, project.style)
+    const prompt = buildReferencePrompt({
+      type: type === 'background' ? 'background' : 'character',
+      attributes,
+      style: project.style,
+      name,
+      description,
+    })
     return NextResponse.json({ attributes, prompt })
   } catch (e) {
     console.error('[ai/refine-character]', e)

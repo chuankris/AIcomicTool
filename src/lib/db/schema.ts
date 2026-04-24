@@ -12,7 +12,6 @@ export const projects = sqliteTable('projects', {
   createdAt: integer('created_at').notNull(),
   currentStep: integer('current_step').notNull().default(0),
   furthestStep: integer('furthest_step').notNull().default(0),
-  shots: text('shots').notNull().default(''),
   imageModel: text('image_model').notNull().default('jimeng'),
 })
 
@@ -25,6 +24,51 @@ export const characters = sqliteTable('characters', {
   prompt: text('prompt').notNull().default(''),
   referenceImageUrl: text('reference_image_url'),
   type: text('type').notNull().default('character'),
+  identityLock: text('identity_lock').notNull().default(''),
+  defaultForm: text('default_form').notNull().default('default'),
+  humanFormPrompt: text('human_form_prompt').notNull().default(''),
+  animalFormPrompt: text('animal_form_prompt').notNull().default(''),
+  transformingFormPrompt: text('transforming_form_prompt').notNull().default(''),
+})
+
+export const storyboardShots = sqliteTable('storyboard_shots', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  index: integer('index').notNull(),
+  sceneDesc: text('scene_desc').notNull().default(''),
+  dialogue: text('dialogue').notNull().default(''),
+  emotion: text('emotion').notNull().default(''),
+  composition: text('composition').notNull().default(''),
+  promptOverride: text('prompt_override'),
+  durationSec: integer('duration_sec').notNull().default(3),
+  subtitlePosition: text('subtitle_position').notNull().default('bottom'),
+  localFeedback: text('local_feedback').notNull().default(''),
+  aspectRatio: text('aspect_ratio').notNull().default('9:16'),
+  resolutionWidth: integer('resolution_width'),
+  resolutionHeight: integer('resolution_height'),
+  safeAreaTop: integer('safe_area_top'),
+  safeAreaBottom: integer('safe_area_bottom'),
+  safeAreaLeft: integer('safe_area_left'),
+  safeAreaRight: integer('safe_area_right'),
+  keyProps: text('key_props').notNull().default('[]'),
+  backgroundId: integer('background_id'),
+  backgroundStrength: integer('background_strength'),
+})
+
+export const shotCharacterRefs = sqliteTable('shot_character_refs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  shotId: integer('shot_id').notNull(),
+  characterId: integer('character_id').notNull(),
+  strength: integer('strength'),
+})
+
+export const shotCharacterNames = sqliteTable('shot_character_names', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  shotId: integer('shot_id').notNull(),
+  name: text('name').notNull(),
+  orderIndex: integer('order_index').notNull().default(0),
 })
 
 export const panels = sqliteTable('panels', {

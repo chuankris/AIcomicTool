@@ -7,11 +7,30 @@ export interface Shot {
   dialogue: string
   emotion: string
   composition: string
+  promptOverride?: string
+  durationSec?: number
+  subtitlePosition?: 'bottom' | 'middle-bottom' | 'none'
+  keyProps?: string[]
+  characterRefs?: Array<{ characterId: number; strength?: number }>
+  backgroundRef?: { backgroundId: number; strength?: number }
+  localFeedback?: string
+  aspectRatio?: '9:16' | '16:9' | '1:1' | '4:3'
+  resolution?: {
+    width?: number
+    height?: number
+  }
+  safeArea?: {
+    top?: number
+    bottom?: number
+    left?: number
+    right?: number
+  }
 }
 
 export type ImageModel = 'jimeng' | 'mj-niji' | 'sd-xl' | 'kling'
 export type PanelStatus = 'pending' | 'generating' | 'done' | 'failed'
 export type CharacterType = 'character' | 'background'
+export type CharacterForm = 'default' | 'human' | 'animal' | 'transforming'
 
 export interface ModelConfig {
   provider: 'claude' | 'openai' | 'gemini' | 'custom'
@@ -28,6 +47,22 @@ export interface CharacterAttributes {
   outfit?: string
   personality?: string
   expressionTendency?: string
+  relationships?: string[]
+  storyRole?: string
+  voiceProfile?: {
+    tone?: string
+    speed?: string
+    lineStyle?: string
+  }
+  fixedOutfit?: string
+  doNotChange?: string[]
+  locationType?: string
+  timeOfDay?: string
+  lighting?: string
+  keyProps?: string[]
+  atmosphere?: string
+  storyUsage?: string
+  reusableShots?: string[]
 }
 
 export interface Project {
@@ -42,7 +77,7 @@ export interface Project {
   createdAt: number
   currentStep: number
   furthestStep: number
-  shots: string
+  shots: Shot[]
   imageModel: string
 }
 
@@ -55,6 +90,9 @@ export interface Character {
   prompt: string
   referenceImageUrl: string | null
   type: CharacterType
+  identityLock?: string
+  defaultForm?: CharacterForm
+  formPrompts?: Partial<Record<CharacterForm, string>>
 }
 
 export interface Panel {

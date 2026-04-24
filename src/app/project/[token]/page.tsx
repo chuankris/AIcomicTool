@@ -33,7 +33,7 @@ export default function ProjectPage() {
         setStep(s)
         setFurthest(f)
         setScript(data.script ?? '')
-        setShots(data.shots ? (() => { try { return JSON.parse(data.shots) } catch { return [] } })() : [])
+        setShots(data.shots ?? [])
         setLoading(false)
         if (data.status === 'generating') {
           setGenerating(true)
@@ -87,7 +87,9 @@ export default function ProjectPage() {
   function handlePanelUpdate(updated: Panel) {
     setProject(prev => prev ? {
       ...prev,
-      panels: prev.panels.map(p => p.id === updated.id ? updated : p),
+      panels: prev.panels.some(p => p.id === updated.id)
+        ? prev.panels.map(p => p.id === updated.id ? updated : p)
+        : [...prev.panels, updated].sort((a, b) => a.index - b.index),
     } : prev)
   }
 

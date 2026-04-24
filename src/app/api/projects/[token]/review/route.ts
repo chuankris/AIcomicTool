@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { applyReviewFeedback } from '@/lib/ai/review-parser'
 import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
+import { serializeCharacter } from '@/lib/db/serializers'
 import type { ModelConfig, Character } from '@/types'
 
 interface ReviewItem {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
     const creds = await getJimengCredentials()
     const chars: Character[] = (await db.select().from(characters).where(eq(characters.projectId, project.id)))
-      .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
+      .map(serializeCharacter)
 
     // 标记所有被审核的格为 generating
     await Promise.all(reviews.map(({ panelId }) =>

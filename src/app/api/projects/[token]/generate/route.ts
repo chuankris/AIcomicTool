@@ -4,9 +4,17 @@ import { db } from '@/lib/db'
 import { projects, characters, panels } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { parseScript } from '@/lib/ai/script-parser'
-import { buildPanelPrompt } from '@/lib/ai/prompt-builder'
+import {
+  buildPanelPrompt,
+  resolvePanelBackground,
+  resolvePanelCharacters,
+  resolvePanelReferenceImage,
+} from '@/lib/ai/prompt-builder'
 import { generateImage } from '@/lib/jimeng/client'
 import { getJimengCredentials } from '@/lib/jimeng/credentials'
+import { formatGenerationError } from '@/lib/errors'
+import { serializeCharacter } from '@/lib/db/serializers'
+import { listProjectShots } from '@/lib/db/shots'
 import type { ModelConfig, Character, Shot } from '@/types'
 
 const CONCURRENCY = 1
@@ -33,40 +41,45 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       return NextResponse.json({ error: 'Project already started' }, { status: 409 })
     }
 
-    await db.update(projects).set({ status: 'generating' }).where(eq(projects.token, token))
-
     const modelConfig: ModelConfig = JSON.parse(project.modelConfig)
 
     const creds = await getJimengCredentials()
 
     const chars: Character[] = (await db.select().from(characters).where(eq(characters.projectId, project.id)))
-      .map(c => ({ ...c, attributes: JSON.parse(c.attributes), type: c.type as Character['type'] }))
+      .map(serializeCharacter)
 
     // 1. 解析剧本
-    const shotList: Shot[] = project.shots ? (() => {
-      try { return JSON.parse(project.shots) } catch { return [] }
-    })() : []
+    const shotList: Shot[] = await listProjectShots(project)
 
-    const parsedPanels = shotList.length > 0
-      ? shotList.map(s => ({
-          index: s.index,
-          sceneDesc: s.sceneDesc,
-          characters: s.characters,
-          dialogue: s.dialogue,
-          emotion: s.emotion,
-          composition: s.composition,
-          prompt: '',
+    const parsedPanels: Shot[] = shotList.length > 0
+      ? shotList
+      : (await parseScript(project.script, project.style, modelConfig)).map(p => ({
+          index: p.index,
+          sceneDesc: p.sceneDesc,
+          characters: p.characters,
+          dialogue: p.dialogue,
+          emotion: p.emotion,
+          composition: p.composition,
         }))
-      : await parseScript(project.script, project.style, modelConfig)
+
+    const existingPanels = await db.select().from(panels).where(eq(panels.projectId, project.id))
+    const existingIndexes = new Set(existingPanels.map(panel => panel.index))
+    const missingPanels = parsedPanels.filter(panel => !existingIndexes.has(panel.index))
+
+    if (missingPanels.length === 0) {
+      return NextResponse.json({ message: 'All panels already exist' }, { status: 200 })
+    }
+
+    await db.update(projects).set({ status: 'generating' }).where(eq(projects.token, token))
 
     // 2. 写入 panels 表（状态 pending）
     const insertedPanels = await db.insert(panels).values(
-      parsedPanels.map(p => ({
+      missingPanels.map(p => ({
         projectId: project.id,
         index: p.index,
         sceneDesc: p.sceneDesc,
         dialogue: p.dialogue,
-        prompt: p.prompt,
+        prompt: '',
         status: 'pending' as const,
         imageModel: project.imageModel || 'jimeng',
       }))
@@ -78,26 +91,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       await db.update(panels).set({ status: 'generating' }).where(eq(panels.id, panel.id))
       try {
         const parsed = parsedByIndex.get(panel.index)
-        const panelChars = chars.filter(c => parsed?.characters.includes(c.name) ?? false)
-        const prompt = buildPanelPrompt({
+        const panelChars = resolvePanelCharacters(chars, parsed ?? {})
+        const panelBackground = resolvePanelBackground(chars, parsed ?? {})
+        const systemPrompt = buildPanelPrompt({
           characters: panelChars,
+          background: panelBackground,
           sceneDesc: panel.sceneDesc,
           emotion: parsed?.emotion ?? '',
           composition: parsed?.composition ?? '',
           style: project.style,
+          shot: parsed,
         })
-        const referenceImageUrl = panelChars[0]?.referenceImageUrl ?? undefined
+        const prompt = parsed?.promptOverride?.trim() || systemPrompt
+        const reference = resolvePanelReferenceImage({
+          characters: panelChars,
+          background: panelBackground,
+          shot: parsed,
+        })
         const { imageUrl } = await generateImage({
           prompt,
           style: project.style,
-          referenceImageUrl,
+          referenceImageUrl: reference.referenceImageUrl,
+          referenceStrength: reference.referenceStrength,
+          width: parsed?.resolution?.width,
+          height: parsed?.resolution?.height,
           accessKeyId: creds.accessKeyId,
           secretAccessKey: creds.secretAccessKey,
         })
         await db.update(panels).set({ imageUrl, prompt, status: 'done' }).where(eq(panels.id, panel.id))
       } catch (err) {
         console.error(`[generate] panel #${panel.index} failed:`, err)
-        await db.update(panels).set({ status: 'failed' }).where(eq(panels.id, panel.id))
+        await db.update(panels)
+          .set({ status: 'failed', reviewFeedback: formatGenerationError(err) })
+          .where(eq(panels.id, panel.id))
       }
     })
 
